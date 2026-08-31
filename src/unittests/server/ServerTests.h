@@ -12,4 +12,8 @@ class ServerTests : public QObject
 private Q_SLOTS:
   void SwitchToScreenInfo_alloc_screen();
   void KeyboardBroadcastInfo_alloc_stateAndSceens();
+  void MouseBroadcastInfo_alloc_stateAndScreens();
+  void MouseBroadcastAction_formatsSelectedScreens();
+  void mapMouseBroadcastCoordinate_data();
+  void mapMouseBroadcastCoordinate();
 };

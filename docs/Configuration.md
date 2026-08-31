@@ -404,6 +404,9 @@ Actions are two lists of individual actions separated by commas. The two lists a
 : Synthesizes the modifiers and mouse button given in ''button'' which has the same form as described in the ''mousebutton'' option.
 : ''mouseDown'' synthesizes a mouse press and ''mouseUp'' synthesizes a mouse release. ''mousebutton'' synthesizes a mouse press on activation and a release on deactivation and is equivalent to a ''mouseDown'' on activation and ''mouseUp'' on deactivation.
 
+* `mouseBroadcast(mode[,computers])`
+: Mirrors the primary computer's pointer position, mouse buttons, and wheel events to the selected client computers while the pointer remains on the primary computer. Positions are scaled to each client's screen dimensions. ''mode'' can be ''off'', ''on'', or ''toggle''; the default is ''toggle''. If ''computers'' is omitted, all connected clients are selected. Otherwise, use ''*'' or a '':'' (colon) separated list of computer names, for example `mouseBroadcast(toggle,client1:client2)`.
+
 * `lockCursorToScreen(mode)`
 : Locks the cursor to or unlocks the cursor from the active computer. ''mode'' can be ''off'' to unlock the cursor, ''on'' to lock the cursor, or ''toggle'' to toggle the current state. The default is ''toggle''. If the configuration has no ''lockCursorToScreen'' action and ''Scroll Lock'' is not used as a hot key then ''Scroll Lock'' toggles cursor locking.
 

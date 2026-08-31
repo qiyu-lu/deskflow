@@ -7,7 +7,10 @@
 
 #include "ServerConfigTests.h"
 
+#include "arch/Arch.h"
 #include "server/Config.h"
+
+#include <sstream>
 
 class OnlySystemFilter : public InputFilter::Condition
 {
@@ -159,6 +162,36 @@ void ServerConfigTests::equalityCheck_diff_neighbours3()
   QVERIFY(b.addScreen("screenC"));
   QVERIFY(b.connect("screenA", Direction::Bottom, 0.0f, 0.5f, "screenC", 0.5f, 1.0f));
   QVERIFY(a != b);
+}
+
+void ServerConfigTests::mouseBroadcastAction_parsesSelectedScreens()
+{
+  static Arch arch;
+
+  std::istringstream input(R"(
+section: screens
+  primary:
+  client1:
+  client2:
+end
+section: links
+end
+section: options
+  keystroke(control+shift+f8) = mouseBroadcast(toggle,client1:client2)
+end
+)");
+  Config config(nullptr);
+  input >> config;
+
+  InputFilter *filter = config.getInputFilter();
+  QCOMPARE(filter->getNumRules(), 1u);
+  const InputFilter::Rule &rule = filter->getRule(0);
+  QCOMPARE(rule.getNumActions(true), 1u);
+
+  const auto *action = dynamic_cast<const InputFilter::MouseBroadcastAction *>(&rule.getAction(true, 0));
+  QVERIFY(action != nullptr);
+  QCOMPARE(action->getMode(), InputFilter::MouseBroadcastAction::kToggle);
+  QVERIFY(action->getScreens() == std::set<std::string>({"client1", "client2"}));
 }
 
 QTEST_MAIN(ServerConfigTests)
