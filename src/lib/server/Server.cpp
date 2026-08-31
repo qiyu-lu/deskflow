@@ -12,6 +12,7 @@
 #include "base/Log.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/DeskflowException.h"
+#include "deskflow/IKeyState.h"
 #include "deskflow/IPlatformScreen.h"
 #include "deskflow/OptionTypes.h"
 #include "deskflow/PacketStreamFilter.h"
@@ -25,16 +26,33 @@
 #include "server/ClientProxyUnknown.h"
 #include "server/PrimaryClient.h"
 
-#ifdef _WIN32
 #include <algorithm>
 #include <array>
-#endif
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 
 using namespace deskflow::server;
+
+int32_t deskflow::server::mapMouseBroadcastCoordinate(
+    int32_t value, int32_t sourceOrigin, int32_t sourceSize, int32_t targetOrigin, int32_t targetSize
+)
+{
+  if (sourceSize <= 1 || targetSize <= 1) {
+    return targetOrigin;
+  }
+
+  const int64_t sourceMin = sourceOrigin;
+  const int64_t sourceMax = sourceMin + sourceSize - 1;
+  const int64_t clampedValue = std::clamp<int64_t>(value, sourceMin, sourceMax);
+  const double fraction = static_cast<double>(clampedValue - sourceMin) / static_cast<double>(sourceSize - 1);
+
+  const int64_t targetMin = targetOrigin;
+  const int64_t targetMax = targetMin + targetSize - 1;
+  const int64_t mapped = targetMin + std::llround(fraction * static_cast<double>(targetSize - 1));
+  return static_cast<int32_t>(std::clamp(mapped, targetMin, targetMax));
+}
 
 //
 // Server
@@ -110,6 +128,9 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Scr
   m_events->addHandler(EventTypes::ServerKeyboardBroadcast, m_inputFilter, [this](const auto &e) {
     handleKeyboardBroadcastEvent(e);
   });
+  m_events->addHandler(EventTypes::ServerMouseBroadcast, m_inputFilter, [this](const auto &e) {
+    handleMouseBroadcastEvent(e);
+  });
   m_events->addHandler(EventTypes::ServerLockCursorToScreen, m_inputFilter, [this](const auto &e) {
     handleLockCursorToScreenEvent(e);
   });
@@ -157,6 +178,7 @@ Server::~Server()
   m_events->removeHandler(PrimaryScreenSaverDeactivated, m_primaryClient->getEventTarget());
   m_events->removeHandler(PrimaryScreenFakeInputBegin, m_inputFilter);
   m_events->removeHandler(PrimaryScreenFakeInputEnd, m_inputFilter);
+  m_events->removeHandler(ServerMouseBroadcast, m_inputFilter);
   m_events->removeHandler(Timer, this);
   stopSwitch();
 
@@ -258,6 +280,7 @@ void Server::adoptClient(BaseClientProxy *client)
 
   // send configuration options to client
   sendOptions(client);
+  reconcileMouseBroadcastTargets();
 
   // activate screen saver on new client if active on the primary screen
   if (m_activeSaver != nullptr) {
@@ -439,11 +462,17 @@ void Server::switchScreen(BaseClientProxy *dst, int32_t x, int32_t y, bool forSc
   // since that's a waste of time we skip that and just warp the
   // mouse.
   if (m_active != dst) {
+    const bool leavingPrimary = m_active == m_primaryClient;
+
     // leave active screen
     if (!m_active->leave()) {
       // cannot leave screen
       LOG_WARN("can't leave screen");
       return;
+    }
+
+    if (leavingPrimary) {
+      leaveMouseBroadcastTargets();
     }
 
     // update the primary client's clipboards if we're leaving the
@@ -491,8 +520,16 @@ void Server::switchScreen(BaseClientProxy *dst, int32_t x, int32_t y, bool forSc
 
     auto *info = new Server::SwitchToScreenInfo(m_active->getName());
     m_events->addEvent(Event(EventTypes::ServerScreenSwitched, this, info));
+
+    if (m_active == m_primaryClient) {
+      reconcileMouseBroadcastTargets();
+    }
   } else {
     m_active->mouseMove(x, y);
+
+    if (m_active == m_primaryClient) {
+      broadcastMousePosition(x, y);
+    }
   }
 }
 
@@ -1145,6 +1182,11 @@ void Server::handleShapeChanged(BaseClientProxy *client)
       onMouseMoveSecondary(0, 0);
     }
   }
+
+  if (m_active == m_primaryClient &&
+      (client == m_primaryClient || m_mouseBroadcastEnteredScreens.contains(getName(client)))) {
+    broadcastMousePosition(m_x, m_y);
+  }
 }
 
 void Server::handleClipboardGrabbed(const Event &event, BaseClientProxy *grabber)
@@ -1244,7 +1286,9 @@ void Server::handleButtonUpEvent(const Event &event)
 void Server::handleMotionPrimaryEvent(const Event &event)
 {
   const auto *info = static_cast<IPlatformScreen::MotionInfo *>(event.getData());
-  onMouseMovePrimary(info->m_x, info->m_y);
+  if (!onMouseMovePrimary(info->m_x, info->m_y)) {
+    broadcastMousePosition(info->m_x, info->m_y);
+  }
 }
 
 void Server::handleMotionSecondaryEvent(const Event &event)
@@ -1390,6 +1434,200 @@ void Server::handleKeyboardBroadcastEvent(const Event &event)
   }
 }
 
+void Server::handleMouseBroadcastEvent(const Event &event)
+{
+  const auto *info = static_cast<MouseBroadcastInfo *>(event.getData());
+
+  bool newState;
+  switch (info->m_state) {
+  default:
+  case MouseBroadcastInfo::kOn:
+    newState = true;
+    break;
+
+  case MouseBroadcastInfo::kOff:
+    newState = false;
+    break;
+
+  case MouseBroadcastInfo::kToggle:
+    newState = !m_mouseBroadcasting;
+    break;
+  }
+
+  if (newState != m_mouseBroadcasting || info->m_screens != m_mouseBroadcastingScreens) {
+    m_mouseBroadcasting = newState;
+    m_mouseBroadcastingScreens = info->m_screens;
+    LOG_DEBUG("mouse broadcasting %s: %s", m_mouseBroadcasting ? "on" : "off", m_mouseBroadcastingScreens.c_str());
+    reconcileMouseBroadcastTargets();
+  }
+}
+
+bool Server::isMouseBroadcastTarget(const std::string &name) const
+{
+  const char *screens = m_mouseBroadcastingScreens.c_str();
+  return IKeyState::KeyInfo::isDefault(screens) || IKeyState::KeyInfo::contains(screens, name);
+}
+
+void Server::mapMouseBroadcastPosition(
+    const BaseClientProxy *target, int32_t sourceX, int32_t sourceY, int32_t &targetX, int32_t &targetY
+) const
+{
+  int32_t sourceOriginX;
+  int32_t sourceOriginY;
+  int32_t sourceWidth;
+  int32_t sourceHeight;
+  m_primaryClient->getShape(sourceOriginX, sourceOriginY, sourceWidth, sourceHeight);
+
+  int32_t targetOriginX;
+  int32_t targetOriginY;
+  int32_t targetWidth;
+  int32_t targetHeight;
+  target->getShape(targetOriginX, targetOriginY, targetWidth, targetHeight);
+
+  targetX =
+      deskflow::server::mapMouseBroadcastCoordinate(sourceX, sourceOriginX, sourceWidth, targetOriginX, targetWidth);
+  targetY =
+      deskflow::server::mapMouseBroadcastCoordinate(sourceY, sourceOriginY, sourceHeight, targetOriginY, targetHeight);
+}
+
+void Server::reconcileMouseBroadcastTargets()
+{
+  std::set<std::string> desiredScreens;
+  if (m_mouseBroadcasting && m_active == m_primaryClient && m_activeSaver == nullptr) {
+    for (const auto &[name, client] : m_clients) {
+      if (client != m_primaryClient && isMouseBroadcastTarget(name)) {
+        desiredScreens.insert(name);
+      }
+    }
+  }
+
+  const auto enteredScreens = m_mouseBroadcastEnteredScreens;
+  for (const auto &name : enteredScreens) {
+    if (desiredScreens.contains(name)) {
+      continue;
+    }
+
+    const auto client = m_clients.find(name);
+    if (client != m_clients.end()) {
+      leaveMouseBroadcastTarget(client->second);
+    } else {
+      m_mouseBroadcastEnteredScreens.erase(name);
+    }
+  }
+
+  int32_t sourceX = m_x;
+  int32_t sourceY = m_y;
+  if (!desiredScreens.empty()) {
+    m_primaryClient->getCursorPos(sourceX, sourceY);
+    m_x = sourceX;
+    m_y = sourceY;
+  }
+
+  for (const auto &name : desiredScreens) {
+    if (m_mouseBroadcastEnteredScreens.contains(name)) {
+      continue;
+    }
+
+    const auto client = m_clients.find(name);
+    if (client == m_clients.end()) {
+      continue;
+    }
+
+    int32_t targetX;
+    int32_t targetY;
+    mapMouseBroadcastPosition(client->second, sourceX, sourceY, targetX, targetY);
+    client->second->enter(targetX, targetY, m_seqNum, m_primaryClient->getToggleMask(), false);
+    for (const auto button : m_mouseButtonsDown) {
+      client->second->mouseDown(button);
+    }
+    m_mouseBroadcastEnteredScreens.insert(name);
+    LOG_DEBUG("mouse broadcast entered screen \"%s\"", name.c_str());
+  }
+}
+
+void Server::leaveMouseBroadcastTarget(BaseClientProxy *client)
+{
+  const std::string name = getName(client);
+  if (!m_mouseBroadcastEnteredScreens.contains(name)) {
+    return;
+  }
+
+  m_mouseBroadcastEnteredScreens.erase(name);
+  for (const auto button : m_mouseButtonsDown) {
+    client->mouseUp(button);
+  }
+  if (!client->leave()) {
+    LOG_WARN("can't leave mouse broadcast screen \"%s\"", name.c_str());
+  }
+  LOG_DEBUG("mouse broadcast left screen \"%s\"", name.c_str());
+}
+
+void Server::leaveMouseBroadcastTargets()
+{
+  const auto enteredScreens = m_mouseBroadcastEnteredScreens;
+  for (const auto &name : enteredScreens) {
+    const auto client = m_clients.find(name);
+    if (client != m_clients.end()) {
+      leaveMouseBroadcastTarget(client->second);
+    } else {
+      m_mouseBroadcastEnteredScreens.erase(name);
+    }
+  }
+}
+
+void Server::broadcastMousePosition(int32_t x, int32_t y)
+{
+  if (!m_mouseBroadcasting || m_active != m_primaryClient || m_activeSaver != nullptr) {
+    return;
+  }
+
+  for (const auto &name : m_mouseBroadcastEnteredScreens) {
+    const auto client = m_clients.find(name);
+    if (client == m_clients.end()) {
+      continue;
+    }
+
+    int32_t targetX;
+    int32_t targetY;
+    mapMouseBroadcastPosition(client->second, x, y, targetX, targetY);
+    client->second->mouseMove(targetX, targetY);
+  }
+}
+
+void Server::broadcastMouseButton(ButtonID button, bool down)
+{
+  if (!m_mouseBroadcasting || m_active != m_primaryClient || m_activeSaver != nullptr) {
+    return;
+  }
+
+  for (const auto &name : m_mouseBroadcastEnteredScreens) {
+    const auto client = m_clients.find(name);
+    if (client == m_clients.end()) {
+      continue;
+    }
+
+    if (down) {
+      client->second->mouseDown(button);
+    } else {
+      client->second->mouseUp(button);
+    }
+  }
+}
+
+void Server::broadcastMouseWheel(int32_t xDelta, int32_t yDelta)
+{
+  if (!m_mouseBroadcasting || m_active != m_primaryClient || m_activeSaver != nullptr) {
+    return;
+  }
+
+  for (const auto &name : m_mouseBroadcastEnteredScreens) {
+    const auto client = m_clients.find(name);
+    if (client != m_clients.end()) {
+      client->second->mouseWheel(xDelta, yDelta);
+    }
+  }
+}
+
 void Server::handleLockCursorToScreenEvent(const Event &event)
 {
   const auto *info = static_cast<LockCursorToScreenInfo *>(event.getData());
@@ -1516,6 +1754,8 @@ void Server::onScreensaver(bool activated)
     BaseClientProxy *client = index->second;
     client->screensaver(activated);
   }
+
+  reconcileMouseBroadcastTargets();
 }
 
 void Server::onKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang, const char *screens)
@@ -1581,6 +1821,9 @@ void Server::onMouseDown(ButtonID id)
   LOG_VERBOSE("onMouseDown id=%d", id);
   assert(m_active != nullptr);
 
+  m_mouseButtonsDown.insert(id);
+  broadcastMouseButton(id, true);
+
   // relay
   m_active->mouseDown(id);
 }
@@ -1589,6 +1832,9 @@ void Server::onMouseUp(ButtonID id)
 {
   LOG_VERBOSE("onMouseUp id=%d", id);
   assert(m_active != nullptr);
+
+  broadcastMouseButton(id, false);
+  m_mouseButtonsDown.erase(id);
 
   // relay
   m_active->mouseUp(id);
@@ -1868,6 +2114,8 @@ void Server::onMouseWheel(int32_t xDelta, int32_t yDelta)
   LOG_VERBOSE("onMouseWheel %+d,%+d", xDelta, yDelta);
   assert(m_active != nullptr);
 
+  broadcastMouseWheel(xDelta, yDelta);
+
   // relay
   m_active->mouseWheel(xDelta, yDelta);
 }
@@ -1921,6 +2169,7 @@ bool Server::removeClient(BaseClientProxy *client)
   m_events->removeHandler(ClipboardChanged, client->getEventTarget());
 
   // remove from list
+  m_mouseBroadcastEnteredScreens.erase(getName(client));
   m_clients.erase(getName(client));
   m_clientSet.erase(i);
 
@@ -1941,6 +2190,8 @@ void Server::closeClient(BaseClientProxy *client, const char *msg)
   // the m_clients list.  adoptClient() may call us with such a
   // client.
   LOG_INFO("disconnecting client \"%s\"", getName(client).c_str());
+
+  leaveMouseBroadcastTarget(client);
 
   // send message
   // FIXME -- avoid type cast (kinda hard, though)
@@ -2047,4 +2298,5 @@ void Server::forceLeaveClient(const BaseClientProxy *client)
 
   // tell primary client about the active sides
   m_primaryClient->reconfigure(getActivePrimarySides());
+  reconcileMouseBroadcastTargets();
 }
