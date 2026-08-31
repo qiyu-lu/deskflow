@@ -7,7 +7,6 @@
 
 #include "ServerConfigTests.h"
 
-#include "arch/Arch.h"
 #include "server/Config.h"
 
 #include <sstream>
@@ -32,6 +31,11 @@ public:
 };
 
 using namespace deskflow::server;
+
+void ServerConfigTests::initTestCase()
+{
+  m_arch.init();
+}
 
 void ServerConfigTests::equalityCheck()
 {
@@ -166,8 +170,6 @@ void ServerConfigTests::equalityCheck_diff_neighbours3()
 
 void ServerConfigTests::mouseBroadcastAction_parsesSelectedScreens()
 {
-  static Arch arch;
-
   std::istringstream input(R"(
 section: screens
   primary:
