@@ -4,13 +4,17 @@
 
 ## 1. 下载新安装包
 
-从个人仓库最新一次成功的 `Package test builds` 工作流下载并解压：
+从个人仓库的
+[Mouse Broadcast Preview 0.1.0](https://github.com/qiyu-lu/deskflow/releases/tag/mouse-broadcast-v0.1.0)
+Release 下载对应平台的 ZIP 并解压：
 
-- Windows：`deskflow-mouse-broadcast-windows-x64`，使用其中的 `.msi`。
-- Ubuntu DEB：`deskflow-mouse-broadcast-ubuntu-x64`，使用其中的 `.deb`。
-- Ubuntu Flatpak：`deskflow-mouse-broadcast-flatpak-x64`，使用其中的 `.flatpak`。
+- Windows：[`deskflow-mouse-broadcast-windows-x64.zip`](https://github.com/qiyu-lu/deskflow/releases/download/mouse-broadcast-v0.1.0/deskflow-mouse-broadcast-windows-x64.zip)，使用其中的 `.msi`。
+- Ubuntu DEB：[`deskflow-mouse-broadcast-ubuntu-x64.zip`](https://github.com/qiyu-lu/deskflow/releases/download/mouse-broadcast-v0.1.0/deskflow-mouse-broadcast-ubuntu-x64.zip)，使用其中的 `.deb`。
+- Ubuntu Flatpak：[`deskflow-mouse-broadcast-flatpak-x64.zip`](https://github.com/qiyu-lu/deskflow/releases/download/mouse-broadcast-v0.1.0/deskflow-mouse-broadcast-flatpak-x64.zip)，使用其中的 `.flatpak`。
 
-建议两台电脑安装同一次构建生成的软件包。
+不要下载 Release 页面底部由 GitHub 自动生成的 `Source code (zip)` 或
+`Source code (tar.gz)`，它们只包含源代码，不是安装包。建议两台电脑安装同一个
+Release 中的软件包。
 
 ## 2. 卸载旧版
 

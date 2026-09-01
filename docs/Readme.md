@@ -2,7 +2,16 @@
 
 Deskflow is a free and open source keyboard and mouse sharing app. Use the keyboard, mouse, or trackpad of one computer to control nearby computers, and work seamlessly between them.
 
-[Homepage](https://deskflow.org) [Code](https://github.com/deskflow/deskflo)
+[Homepage](https://deskflow.org) [Code](https://github.com/deskflow/deskflow)
+
+## Mouse broadcast extension
+
+This fork adds server-side mouse broadcasting and makes broadcasting mutually exclusive with
+normal cross-screen cursor switching.
+
+- [Fork overview](../.github/README.md)
+- [Chinese user guide](MouseBroadcastGuide.zh_CN.md)
+- [Preview release](https://github.com/qiyu-lu/deskflow/releases/tag/mouse-broadcast-v0.1.0)
 
 ## Getting help online
 
