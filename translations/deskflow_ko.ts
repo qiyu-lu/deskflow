@@ -134,6 +134,22 @@ p, li { white-space: pre-wrap; }
         <source>Switch to %1</source>
         <translation>%1(으)로 전환</translation>
     </message>
+    <message>
+        <source>Control mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ClientConfigDialog</name>
