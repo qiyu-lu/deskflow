@@ -9,10 +9,11 @@
 
 #pragma once
 
+#include "common/Action.h"
+
 #include <QDialog>
 
 class Hotkey;
-class Action;
 class ServerConfig;
 class KeySequenceWidget;
 
@@ -25,18 +26,6 @@ class ActionDialog : public QDialog
   Q_OBJECT
 
 public:
-  struct ActionTypes
-  {
-    inline static const auto PressKey = 0;
-    inline static const auto ReleaseKey = 1;
-    inline static const auto ToggleKey = 2;
-    inline static const auto SwitchTo = 3;
-    inline static const auto SwitchInDirection = 4;
-    inline static const auto SwitchToNextScreen = 5;
-    inline static const auto ModifyCursorLock = 6;
-    inline static const auto RestartServer = 7;
-  };
-
   ActionDialog(QWidget *parent, const ServerConfig &config, Hotkey &hotkey, Action &action);
   ~ActionDialog() override;
 
@@ -48,7 +37,8 @@ private:
   void keySequenceChanged();
   void itemToggled() const;
   void actionTypeChanged(int index);
-  bool isKeyAction(int index) const;
+  Action::Type currentActionType() const;
+  bool isKeyAction(Action::Type type) const;
   bool canSave() const;
 
   std::unique_ptr<Ui::ActionDialog> ui;

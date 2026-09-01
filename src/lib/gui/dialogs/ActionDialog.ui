@@ -78,6 +78,11 @@
          <string>Restart the server</string>
         </property>
        </item>
+       <item>
+        <property name="text">
+         <string>Control mouse broadcasting</string>
+        </property>
+       </item>
       </widget>
      </item>
     </layout>
@@ -136,6 +141,28 @@
        <item>
         <property name="text">
          <string>Disable the cursor lock</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="comboMouseBroadcastMode">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <item>
+        <property name="text">
+         <string>Toggle mouse broadcasting</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Enable mouse broadcasting</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Disable mouse broadcasting</string>
         </property>
        </item>
       </widget>

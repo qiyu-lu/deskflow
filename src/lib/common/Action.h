@@ -25,6 +25,7 @@ struct SettingsKeys
   inline static const QString SwitchToScreen = QStringLiteral("switchScreenName");
   inline static const QString SwitchDirection = QStringLiteral("switchInDirection");
   inline static const QString LockToScreen = QStringLiteral("lockCursorToScreen");
+  inline static const QString MouseBroadcast = QStringLiteral("mouseBroadcast");
   inline static const QString ActiveOnRelease = QStringLiteral("activeOnRelease");
   inline static const QString HasScreens = QStringLiteral("hasScreens");
   inline static const QString RestartServer = QStringLiteral("restartServer");
@@ -47,6 +48,7 @@ public:
     mouseDown,
     mouseUp,
     mousebutton,
+    mouseBroadcast,
   };
   enum class SwitchDirection
   {
@@ -56,6 +58,12 @@ public:
     down
   };
   enum class LockCursorMode
+  {
+    toggle,
+    on,
+    off
+  };
+  enum class MouseBroadcastMode
   {
     toggle,
     on,
@@ -90,6 +98,9 @@ public:
   int lockCursorMode() const;
   void setLockCursorMode(int m);
 
+  int mouseBroadcastMode() const;
+  void setMouseBroadcastMode(int m);
+
   bool activeOnRelease() const;
   void setActiveOnRelease(bool b);
 
@@ -108,6 +119,7 @@ private:
   QString m_switchScreenName = QString();
   int m_switchDirection = static_cast<int>(SwitchDirection::left);
   int m_lockCursorMode = static_cast<int>(LockCursorMode::toggle);
+  int m_mouseBroadcastMode = static_cast<int>(MouseBroadcastMode::toggle);
   bool m_activeOnRelease = false;
   bool m_hasScreens = false;
   bool m_restartServer;
@@ -124,7 +136,8 @@ private:
       QStringLiteral("restartServer"),
       QStringLiteral("mouseDown"),
       QStringLiteral("mouseUp"),
-      QStringLiteral("mousebutton")
+      QStringLiteral("mousebutton"),
+      QStringLiteral("mouseBroadcast")
   };
 
   inline static const QStringList m_switchDirectionNames{
@@ -132,6 +145,10 @@ private:
   };
 
   inline static const QStringList m_lockCursorModeNames{
+      QStringLiteral("toggle"), QStringLiteral("on"), QStringLiteral("off")
+  };
+
+  inline static const QStringList m_mouseBroadcastModeNames{
       QStringLiteral("toggle"), QStringLiteral("on"), QStringLiteral("off")
   };
 };
