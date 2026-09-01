@@ -130,7 +130,8 @@ private:
 
   bool detectXI2();
 #ifdef HAVE_XI2
-  void selectXIRawMotion();
+  void selectXIRawPointerEvents();
+  void onMouseRawButton(unsigned int button, bool press);
 #endif
   void selectEvents(Window) const;
   void doSelectEvents(Window) const;

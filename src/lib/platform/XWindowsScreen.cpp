@@ -119,7 +119,7 @@ XWindowsScreen::XWindowsScreen(const char *displayName, bool isPrimary, IEventQu
 #ifdef HAVE_XI2
     m_xi2detected = detectXI2();
     if (m_xi2detected) {
-      selectXIRawMotion();
+      selectXIRawPointerEvents();
     } else
 #endif
     {
@@ -1164,7 +1164,9 @@ void XWindowsScreen::handleSystemEvent(const Event &event)
 
 #ifdef HAVE_XI2
   if (m_xi2detected) {
-    // Process RawMotion
+    // Process raw pointer events. Raw buttons are only needed while the
+    // pointer is on the primary screen. Once the pointer leaves, the grab
+    // window receives the corresponding core button events instead.
     auto *cookie = &xevent->xcookie;
     if (XGetEventData(m_display, cookie) && cookie->type == GenericEvent && cookie->extension == xi_opcode) {
       if (cookie->evtype == XI_RawMotion) {
@@ -1181,6 +1183,12 @@ void XWindowsScreen::handleSystemEvent(const Event &event)
             &xmotion.y, &msk
         );
         onMouseMove(xmotion);
+        XFreeEventData(m_display, cookie);
+        return;
+      }
+      if (m_isOnScreen && (cookie->evtype == XI_RawButtonPress || cookie->evtype == XI_RawButtonRelease)) {
+        const auto *rawEvent = static_cast<const XIRawEvent *>(cookie->data);
+        onMouseRawButton(rawEvent->detail, cookie->evtype == XI_RawButtonPress);
         XFreeEventData(m_display, cookie);
         return;
       }
@@ -1473,6 +1481,31 @@ void XWindowsScreen::onMouseRelease(const XButtonEvent &xbutton)
   }
 }
 
+#ifdef HAVE_XI2
+void XWindowsScreen::onMouseRawButton(unsigned int button, bool press)
+{
+  XButtonEvent xbutton{};
+  xbutton.type = press ? ButtonPress : ButtonRelease;
+  xbutton.display = m_display;
+  xbutton.window = m_window;
+  xbutton.button = button;
+
+  Window root;
+  Window child;
+  int rootX;
+  int rootY;
+  int windowX;
+  int windowY;
+  XQueryPointer(m_display, m_root, &root, &child, &rootX, &rootY, &windowX, &windowY, &xbutton.state);
+
+  if (press) {
+    onMousePress(xbutton);
+  } else {
+    onMouseRelease(xbutton);
+  }
+}
+#endif
+
 void XWindowsScreen::onMouseMove(const XMotionEvent &xmotion)
 {
   LOG_VERBOSE("event: MotionNotify %d,%d", xmotion.x_root, xmotion.y_root);
@@ -1744,9 +1777,7 @@ ButtonID XWindowsScreen::mapButtonFromX(const XButtonEvent *event) const
   case 1:
   case 2:
   case 3:
-  case 6:
-  case 7:
-    return static_cast<ButtonID>(button); // Handle Left, Middle and Right buttons
+    return static_cast<ButtonID>(button);
   case 8:
     return kButtonExtra0; // Mouse 4
   case 9:
@@ -1944,16 +1975,16 @@ bool XWindowsScreen::detectXI2()
 }
 
 #ifdef HAVE_XI2
-void XWindowsScreen::selectXIRawMotion()
+void XWindowsScreen::selectXIRawPointerEvents()
 {
   XIEventMask mask;
 
-  mask.deviceid = XIAllDevices;
   mask.mask_len = XIMaskLen(XI_RawMotion);
   mask.mask = (unsigned char *)calloc(mask.mask_len, sizeof(char));
   mask.deviceid = XIAllMasterDevices;
-  memset(mask.mask, 0, 2);
-  XISetMask(mask.mask, XI_RawKeyRelease);
+  memset(mask.mask, 0, mask.mask_len);
+  XISetMask(mask.mask, XI_RawButtonPress);
+  XISetMask(mask.mask, XI_RawButtonRelease);
   XISetMask(mask.mask, XI_RawMotion);
   XISelectEvents(m_display, DefaultRootWindow(m_display), &mask, 1);
   free(mask.mask);
