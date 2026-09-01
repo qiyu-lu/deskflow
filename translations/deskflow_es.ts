@@ -601,6 +601,82 @@ Además, verifique que puede %1 el archivo de configuración del servidor: %2</t
         <source>&lt;p&gt;Keyboard layout support requires matching layouts on all computers. The following layouts from the other computer are not installed on this computer:&lt;/p&gt;&lt;p&gt;&lt;b&gt;%1&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Please install them to enable support for these layouts.&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Targets: All</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stop mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All connected computers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcast to all connected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Targets: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcast to: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting could not be changed because the server is not ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting requires a single monitor on the server computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the cursor back to the server computer before starting mouse broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting needs at least one selected computer to be connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped because the last selected computer disconnected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting started.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Start the server to use mouse broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for the server to confirm mouse broadcasting state.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connect at least one selected computer to start mouse broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting keeps the cursor on the server computer until broadcasting is stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send mouse movement, clicks, and scrolling to the selected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>NewScreenWidget</name>
