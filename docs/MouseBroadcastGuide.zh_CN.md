@@ -7,7 +7,8 @@
 从个人仓库最新一次成功的 `Package test builds` 工作流下载并解压：
 
 - Windows：`deskflow-mouse-broadcast-windows-x64`，使用其中的 `.msi`。
-- Ubuntu：`deskflow-mouse-broadcast-ubuntu-x64`，使用其中的 `.deb`。
+- Ubuntu DEB：`deskflow-mouse-broadcast-ubuntu-x64`，使用其中的 `.deb`。
+- Ubuntu Flatpak：`deskflow-mouse-broadcast-flatpak-x64`，使用其中的 `.flatpak`。
 
 建议两台电脑安装同一次构建生成的软件包。
 
@@ -19,13 +20,29 @@
 
 打开“设置 → 应用 → 已安装的应用”，找到 Deskflow 并选择“卸载”。如果卸载后旧的 Deskflow 服务仍在运行，重启 Windows 后再安装新版。
 
-### Ubuntu
+### Ubuntu DEB 版
 
 打开终端执行：
 
 ```bash
 sudo apt remove deskflow
 ```
+
+### Ubuntu Flatpak 版
+
+可以先用以下命令确认是否安装了 Flatpak 版：
+
+```bash
+flatpak info org.deskflow.deskflow
+```
+
+如果 Deskflow 正在运行，先从托盘退出，然后卸载：
+
+```bash
+flatpak uninstall org.deskflow.deskflow
+```
+
+不要添加 `--delete-data`，这样可以保留原有 Flatpak 用户数据。
 
 ## 3. 安装新版
 
@@ -34,6 +51,10 @@ sudo apt remove deskflow
 双击下载的 `.msi`，按照安装向导完成安装。建议使用 MSI 安装版，不使用便携版，以保证后台服务、UAC 和登录界面支持正常工作。
 
 ### Ubuntu
+
+DEB 和 Flatpak 二选一，不要同时运行两个版本。
+
+#### 安装 DEB
 
 进入 `.deb` 所在目录并安装。以下命令要求当前目录中只有一个匹配的新安装包：
 
@@ -44,6 +65,18 @@ deskflow-core --version
 ```
 
 如果解压目录名称不同，请相应修改 `cd` 路径。
+
+#### 安装 Flatpak
+
+进入 `.flatpak` 所在目录并安装：
+
+```bash
+cd ~/Downloads/deskflow-mouse-broadcast-flatpak-x64
+flatpak install --user ./deskflow-*-linux-x86_64.flatpak
+flatpak run org.deskflow.deskflow
+```
+
+如果解压目录或文件名不同，请相应修改路径。
 
 ## 4. 配置和使用鼠标广播
 
@@ -69,6 +102,7 @@ deskflow-core --version
 ## 6. 注意事项
 
 - 不要同时运行旧版和新版 Deskflow，否则可能发生端口、服务或 IPC socket 冲突。
+- Flatpak 与 DEB 的配置目录相互隔离，切换安装方式后通常需要重新配置 Server/Client、屏幕布局和广播快捷键。
 - 广播仅在光标位于 Ubuntu 主机时工作；测试时避免从屏幕边缘切换到客户端，必要时启用光标锁定。
 - Windows 客户端名称必须与 GUI 中选择的目标名称一致。
 - Ubuntu X11 可重点测试点击和滚轮修复；可用 `echo $XDG_SESSION_TYPE` 查看当前会话类型。
