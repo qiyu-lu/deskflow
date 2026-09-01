@@ -1176,6 +1176,12 @@ void Server::handleShapeChanged(BaseClientProxy *client)
 
   // handle resolution change to primary screen
   if (client == m_primaryClient) {
+    if (m_mouseBroadcasting && m_primaryClient->hasMultipleMonitors()) {
+      m_mouseBroadcasting = false;
+      LOG_WARN("mouse broadcasting disabled because the primary screen now has multiple monitors");
+      reconcileMouseBroadcastTargets();
+    }
+
     if (client == m_active) {
       onMouseMovePrimary(m_x, m_y);
     } else {
@@ -1452,6 +1458,11 @@ void Server::handleMouseBroadcastEvent(const Event &event)
   case MouseBroadcastInfo::kToggle:
     newState = !m_mouseBroadcasting;
     break;
+  }
+
+  if (newState && m_primaryClient->hasMultipleMonitors()) {
+    newState = false;
+    LOG_WARN("mouse broadcasting requires a single monitor on the primary screen; enable request ignored");
   }
 
   if (newState != m_mouseBroadcasting || info->m_screens != m_mouseBroadcastingScreens) {

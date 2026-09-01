@@ -237,6 +237,12 @@ public:
   */
   bool isLockedToScreen() const;
 
+  //! Test if the desktop spans multiple monitors
+  /*!
+  Returns true iff the platform reports more than one monitor.
+  */
+  bool hasMultipleMonitors() const;
+
   //! Get jump zone size
   /*!
   Return the jump zone size, the size of the regions on the edges of

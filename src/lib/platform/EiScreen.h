@@ -80,6 +80,7 @@ public:
   void setOptions(const OptionsList &options) override;
   void setSequenceNumber(std::uint32_t) override;
   bool isPrimary() const override;
+  bool hasMultipleMonitors() const override;
 
   // Send clipboard event (needed by PortalInputCapture)
   void sendClipboardEvent(EventTypes type, ClipboardID id) const;
@@ -172,6 +173,7 @@ private:
   std::uint32_t m_w = 0;
   std::uint32_t m_h = 0;
   bool m_isShapeInitialized = false;
+  bool m_multimon = false;
 
   // true if mouse has entered the screen
   bool m_isOnScreen;

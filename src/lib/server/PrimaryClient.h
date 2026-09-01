@@ -96,6 +96,9 @@ public:
   */
   bool isLockedToScreen() const;
 
+  //! Test if the primary desktop spans multiple monitors
+  bool hasMultipleMonitors() const;
+
   //@}
 
   // FIXME -- these probably belong on IScreen

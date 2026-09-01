@@ -365,6 +365,11 @@ bool Screen::isLockedToScreen() const
   return false;
 }
 
+bool Screen::hasMultipleMonitors() const
+{
+  return m_screen->hasMultipleMonitors();
+}
+
 int32_t Screen::getJumpZoneSize() const
 {
   if (!m_isPrimary) {

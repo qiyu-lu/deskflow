@@ -25,6 +25,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <set>
+#include <tuple>
 #include <unistd.h>
 #include <vector>
 
@@ -519,6 +521,11 @@ bool EiScreen::isPrimary() const
   return m_isPrimary;
 }
 
+bool EiScreen::hasMultipleMonitors() const
+{
+  return m_multimon;
+}
+
 void EiScreen::updateShape()
 {
   std::uint32_t newW = 1;
@@ -526,6 +533,7 @@ void EiScreen::updateShape()
   std::uint32_t newX = std::numeric_limits<uint32_t>::max();
   std::uint32_t newY = std::numeric_limits<uint32_t>::max();
   bool foundRegion = false;
+  std::set<std::tuple<int32_t, int32_t, uint32_t, uint32_t>> regions;
   for (auto it = m_eiDevices.begin(); it != m_eiDevices.end(); it++) {
     auto idx = 0;
     struct ei_region *r;
@@ -535,6 +543,7 @@ void EiScreen::updateShape()
       newY = std::min(ei_region_get_y(r), newY);
       newW = std::max(ei_region_get_x(r) + ei_region_get_width(r), newW);
       newH = std::max(ei_region_get_y(r) + ei_region_get_height(r), newH);
+      regions.emplace(ei_region_get_x(r), ei_region_get_y(r), ei_region_get_width(r), ei_region_get_height(r));
     }
   }
 
@@ -545,7 +554,8 @@ void EiScreen::updateShape()
 
   LOG_DEBUG("logical output size: %dx%d@%d.%d", newW, newH, newX, newY);
 
-  const bool changed = newX != m_x || newY != m_y || newW != m_w || newH != m_h;
+  const bool newMultimon = regions.size() > 1;
+  const bool changed = newX != m_x || newY != m_y || newW != m_w || newH != m_h || newMultimon != m_multimon;
 
   if (!m_isShapeInitialized) {
     m_cursorX = newX + newW / 2;
@@ -560,6 +570,7 @@ void EiScreen::updateShape()
   m_y = newY;
   m_w = newW;
   m_h = newH;
+  m_multimon = newMultimon;
 
   if (changed) {
     sendEvent(EventTypes::ScreenShapeChanged, nullptr);

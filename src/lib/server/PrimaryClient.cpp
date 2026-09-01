@@ -69,6 +69,11 @@ bool PrimaryClient::isLockedToScreen() const
   return m_screen->isLockedToScreen();
 }
 
+bool PrimaryClient::hasMultipleMonitors() const
+{
+  return m_screen->hasMultipleMonitors();
+}
+
 void *PrimaryClient::getEventTarget() const
 {
   return m_screen->getEventTarget();

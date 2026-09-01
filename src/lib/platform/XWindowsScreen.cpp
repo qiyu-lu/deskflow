@@ -425,6 +425,11 @@ bool XWindowsScreen::isPrimary() const
   return m_isPrimary;
 }
 
+bool XWindowsScreen::hasMultipleMonitors() const
+{
+  return m_xinerama;
+}
+
 std::string XWindowsScreen::getSecureInputApp() const
 {
   // ignore on Linux

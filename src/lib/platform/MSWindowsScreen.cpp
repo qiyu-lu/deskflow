@@ -411,6 +411,11 @@ bool MSWindowsScreen::isPrimary() const
   return m_isPrimary;
 }
 
+bool MSWindowsScreen::hasMultipleMonitors() const
+{
+  return GetSystemMetrics(SM_CMONITORS) > 1;
+}
+
 void *MSWindowsScreen::getEventTarget() const
 {
   return const_cast<MSWindowsScreen *>(this);
