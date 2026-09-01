@@ -78,4 +78,55 @@ void ServerTests::mapMouseBroadcastCoordinate()
   );
 }
 
+void ServerTests::mouseBroadcastStartAllowed_data()
+{
+  QTest::addColumn<bool>("activeOnPrimary");
+  QTest::addColumn<bool>("screensaverActive");
+  QTest::addColumn<bool>("expected");
+
+  QTest::newRow("primary-screen") << true << false << true;
+  QTest::newRow("client-screen") << false << false << false;
+  QTest::newRow("screensaver-active") << true << true << false;
+}
+
+void ServerTests::mouseBroadcastStartAllowed()
+{
+  QFETCH(bool, activeOnPrimary);
+  QFETCH(bool, screensaverActive);
+  QFETCH(bool, expected);
+
+  QCOMPARE(deskflow::server::isMouseBroadcastStartAllowed(activeOnPrimary, screensaverActive), expected);
+}
+
+void ServerTests::mouseBroadcastScreenSwitchBlocked_data()
+{
+  QTest::addColumn<bool>("broadcasting");
+  QTest::addColumn<bool>("forScreensaver");
+  QTest::addColumn<bool>("activeOnPrimary");
+  QTest::addColumn<bool>("destinationIsPrimary");
+  QTest::addColumn<bool>("expected");
+
+  QTest::newRow("broadcast-primary-to-client") << true << false << true << false << true;
+  QTest::newRow("broadcast-primary-to-primary") << true << false << true << true << false;
+  QTest::newRow("screensaver-switch") << true << true << true << false << false;
+  QTest::newRow("ordinary-switch") << false << false << true << false << false;
+  QTest::newRow("active-on-client") << true << false << false << true << false;
+}
+
+void ServerTests::mouseBroadcastScreenSwitchBlocked()
+{
+  QFETCH(bool, broadcasting);
+  QFETCH(bool, forScreensaver);
+  QFETCH(bool, activeOnPrimary);
+  QFETCH(bool, destinationIsPrimary);
+  QFETCH(bool, expected);
+
+  QCOMPARE(
+      deskflow::server::shouldBlockMouseBroadcastScreenSwitch(
+          broadcasting, forScreensaver, activeOnPrimary, destinationIsPrimary
+      ),
+      expected
+  );
+}
+
 QTEST_MAIN(ServerTests)

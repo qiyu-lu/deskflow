@@ -14,6 +14,8 @@
 #include "net/NetworkAddress.h"
 #include "server/Config.h"
 
+#include <QStringList>
+
 #include <memory>
 
 enum class ServerState
@@ -69,6 +71,8 @@ public:
   void reloadConfig();
   void forceReconnect();
   void resetServer();
+  void requestMouseBroadcast(bool enabled, const QStringList &targets);
+  void requestMouseBroadcastState();
   void handleClientConnected(const Event &e, ClientListener *listener);
   void closeServer(Server *server);
   void stopRetryTimer();

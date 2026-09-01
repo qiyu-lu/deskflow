@@ -10,6 +10,7 @@
 
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "common/MouseBroadcastProtocol.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/DeskflowException.h"
 #include "deskflow/IKeyState.h"
@@ -52,6 +53,18 @@ int32_t deskflow::server::mapMouseBroadcastCoordinate(
   const int64_t targetMax = targetMin + targetSize - 1;
   const int64_t mapped = targetMin + std::llround(fraction * static_cast<double>(targetSize - 1));
   return static_cast<int32_t>(std::clamp(mapped, targetMin, targetMax));
+}
+
+bool deskflow::server::isMouseBroadcastStartAllowed(bool activeOnPrimary, bool screensaverActive)
+{
+  return activeOnPrimary && !screensaverActive;
+}
+
+bool deskflow::server::shouldBlockMouseBroadcastScreenSwitch(
+    bool broadcasting, bool forScreensaver, bool activeOnPrimary, bool destinationIsPrimary
+)
+{
+  return broadcasting && !forScreensaver && activeOnPrimary && !destinationIsPrimary;
 }
 
 //
@@ -349,7 +362,7 @@ uint32_t Server::getActivePrimarySides() const
   using enum DirectionMask;
   using enum Direction;
   uint32_t sides = 0;
-  if (!isLockedToScreenServer()) {
+  if (!isLockedToScreenServer() && !m_mouseBroadcasting) {
     if (hasAnyNeighbor(m_primaryClient, Left)) {
       sides |= static_cast<int>(LeftMask);
     }
@@ -374,6 +387,13 @@ bool Server::isLockedToScreenServer() const
 
 bool Server::isLockedToScreen() const
 {
+  // Mouse broadcasting uses the primary screen as its coordinate source.
+  // Keep this transient lock separate from the user's lock-to-screen setting.
+  if (m_mouseBroadcasting && m_active == m_primaryClient) {
+    LOG_VERBOSE("cursor is temporarily locked to the primary screen while mouse broadcasting");
+    return true;
+  }
+
   if (m_disableLockToScreen) {
     return false;
   }
@@ -407,6 +427,14 @@ int32_t Server::getJumpZoneSize(const BaseClientProxy *client) const
 void Server::switchScreen(BaseClientProxy *dst, int32_t x, int32_t y, bool forScreensaver)
 {
   assert(dst != nullptr);
+  assert(m_active != nullptr);
+
+  if (shouldBlockMouseBroadcastScreenSwitch(
+          m_mouseBroadcasting, forScreensaver, m_active == m_primaryClient, dst == m_primaryClient
+      )) {
+    LOG_INFO("screen switch ignored while mouse broadcasting is enabled");
+    return;
+  }
 
   int32_t dx;
   int32_t dy;
@@ -442,8 +470,6 @@ void Server::switchScreen(BaseClientProxy *dst, int32_t x, int32_t y, bool forSc
         y, dy + dh
     );
   }
-
-  assert(m_active != nullptr);
 
   LOG_INFO("switch from \"%s\" to \"%s\" at %d,%d", getName(m_active).c_str(), getName(dst).c_str(), x, y);
 
@@ -1177,9 +1203,8 @@ void Server::handleShapeChanged(BaseClientProxy *client)
   // handle resolution change to primary screen
   if (client == m_primaryClient) {
     if (m_mouseBroadcasting && m_primaryClient->hasMultipleMonitors()) {
-      m_mouseBroadcasting = false;
       LOG_WARN("mouse broadcasting disabled because the primary screen now has multiple monitors");
-      reconcileMouseBroadcastTargets();
+      updateMouseBroadcast(MouseBroadcastInfo::kOff, m_mouseBroadcastingScreens, "multipleMonitors");
     }
 
     if (client == m_active) {
@@ -1444,8 +1469,20 @@ void Server::handleMouseBroadcastEvent(const Event &event)
 {
   const auto *info = static_cast<MouseBroadcastInfo *>(event.getData());
 
+  setMouseBroadcast(info->m_state, info->m_screens);
+}
+
+void Server::setMouseBroadcast(MouseBroadcastInfo::State state, const std::string &screens)
+{
+  updateMouseBroadcast(state, screens, "");
+}
+
+void Server::updateMouseBroadcast(MouseBroadcastInfo::State state, const std::string &screens, const char *reason)
+{
+  const char *stateReason = reason;
+
   bool newState;
-  switch (info->m_state) {
+  switch (state) {
   default:
   case MouseBroadcastInfo::kOn:
     newState = true;
@@ -1462,21 +1499,76 @@ void Server::handleMouseBroadcastEvent(const Event &event)
 
   if (newState && m_primaryClient->hasMultipleMonitors()) {
     newState = false;
+    stateReason = "multipleMonitors";
     LOG_WARN("mouse broadcasting requires a single monitor on the primary screen; enable request ignored");
   }
 
-  if (newState != m_mouseBroadcasting || info->m_screens != m_mouseBroadcastingScreens) {
+  if (newState && !isMouseBroadcastStartAllowed(m_active == m_primaryClient, m_activeSaver != nullptr)) {
+    newState = false;
+    stateReason = "cursorNotOnServer";
+    LOG_WARN("mouse broadcasting requires the cursor to be on the primary screen; enable request ignored");
+  }
+
+  if (newState && !hasConnectedMouseBroadcastTarget(screens)) {
+    newState = false;
+    stateReason = "noTargets";
+    LOG_WARN("mouse broadcasting requires at least one connected target; enable request ignored");
+  }
+
+  const bool stateChanged = newState != m_mouseBroadcasting;
+  if (stateChanged || screens != m_mouseBroadcastingScreens) {
     m_mouseBroadcasting = newState;
-    m_mouseBroadcastingScreens = info->m_screens;
+    m_mouseBroadcastingScreens = screens;
     LOG_DEBUG("mouse broadcasting %s: %s", m_mouseBroadcasting ? "on" : "off", m_mouseBroadcastingScreens.c_str());
+
+    if (stateChanged) {
+      stopSwitch();
+      m_primaryClient->reconfigure(getActivePrimarySides());
+    }
+
     reconcileMouseBroadcastTargets();
   }
+
+  sendMouseBroadcastStateIpc(stateReason);
+}
+
+void Server::sendMouseBroadcastStateIpc(const char *reason) const
+{
+  std::set<std::string> targets;
+  IKeyState::KeyInfo::split(m_mouseBroadcastingScreens.c_str(), targets);
+
+  QStringList targetList;
+  if (!targets.contains("*")) {
+    for (const auto &target : targets) {
+      targetList.append(QString::fromStdString(target));
+    }
+  }
+
+  ipcSendToClient(
+      QStringLiteral("mouseBroadcastState"),
+      deskflow::mouse_broadcast::formatState(m_mouseBroadcasting, targetList, QString::fromUtf8(reason))
+  );
 }
 
 bool Server::isMouseBroadcastTarget(const std::string &name) const
 {
-  const char *screens = m_mouseBroadcastingScreens.c_str();
-  return IKeyState::KeyInfo::isDefault(screens) || IKeyState::KeyInfo::contains(screens, name);
+  return isMouseBroadcastTarget(name, m_mouseBroadcastingScreens);
+}
+
+bool Server::isMouseBroadcastTarget(const std::string &name, const std::string &screens) const
+{
+  const char *screensValue = screens.c_str();
+  return IKeyState::KeyInfo::isDefault(screensValue) || IKeyState::KeyInfo::contains(screensValue, name);
+}
+
+bool Server::hasConnectedMouseBroadcastTarget(const std::string &screens) const
+{
+  for (const auto &[name, client] : m_clients) {
+    if (client != m_primaryClient && isMouseBroadcastTarget(name, screens)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void Server::mapMouseBroadcastPosition(
@@ -2180,9 +2272,16 @@ bool Server::removeClient(BaseClientProxy *client)
   m_events->removeHandler(ClipboardChanged, client->getEventTarget());
 
   // remove from list
-  m_mouseBroadcastEnteredScreens.erase(getName(client));
-  m_clients.erase(getName(client));
+  const auto name = getName(client);
+  m_mouseBroadcastEnteredScreens.erase(name);
+  m_clients.erase(name);
   m_clientSet.erase(i);
+
+  if (client != m_primaryClient && m_mouseBroadcasting &&
+      !hasConnectedMouseBroadcastTarget(m_mouseBroadcastingScreens)) {
+    LOG_WARN("mouse broadcasting disabled because the last selected target disconnected");
+    updateMouseBroadcast(MouseBroadcastInfo::kOff, m_mouseBroadcastingScreens, "targetDisconnected");
+  }
 
   return true;
 }

@@ -35,3 +35,10 @@ create_test(
   SOURCE ActionTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/common"
 )
+
+create_test(
+  NAME MouseBroadcastProtocolTests
+  DEPENDS common
+  SOURCE MouseBroadcastProtocolTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/common"
+)

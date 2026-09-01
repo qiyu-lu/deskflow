@@ -139,7 +139,7 @@ p, li { white-space: pre-wrap; }
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Toggle mouse broadcasting</source>
+        <source>Toggle mouse broadcasting (recommended)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

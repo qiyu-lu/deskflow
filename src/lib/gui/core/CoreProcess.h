@@ -47,6 +47,7 @@ public:
   void applyLogLevel();
   void clearSettings();
   void retryDaemon();
+  bool setMouseBroadcast(bool enabled, const QStringList &targets);
 
   // getters
   Settings::CoreMode mode() const
@@ -88,6 +89,7 @@ Q_SIGNALS:
   void secureSocket(bool enabled);
   void daemonIpcClientConnectionFailed();
   void connectedClientsChanged(const QStringList &clients);
+  void mouseBroadcastStateChanged(bool enabled, const QStringList &targets, const QString &reason);
   void securityLevelChanged(QString securityLevel);
   void unrecognisedClient(const QString &clientName);
   void connectionRefused(deskflow::core::ConnectionRefusal reason);

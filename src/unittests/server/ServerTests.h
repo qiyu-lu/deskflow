@@ -16,4 +16,8 @@ private Q_SLOTS:
   void MouseBroadcastAction_formatsSelectedScreens();
   void mapMouseBroadcastCoordinate_data();
   void mapMouseBroadcastCoordinate();
+  void mouseBroadcastStartAllowed_data();
+  void mouseBroadcastStartAllowed();
+  void mouseBroadcastScreenSwitchBlocked_data();
+  void mouseBroadcastScreenSwitchBlocked();
 };

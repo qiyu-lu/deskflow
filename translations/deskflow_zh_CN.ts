@@ -136,19 +136,19 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <source>Control mouse broadcasting</source>
-        <translation type="unfinished"></translation>
+        <translation>控制鼠标广播</translation>
     </message>
     <message>
-        <source>Toggle mouse broadcasting</source>
-        <translation type="unfinished"></translation>
+        <source>Toggle mouse broadcasting (recommended)</source>
+        <translation>切换鼠标广播（推荐）</translation>
     </message>
     <message>
         <source>Enable mouse broadcasting</source>
-        <translation type="unfinished"></translation>
+        <translation>开启鼠标广播</translation>
     </message>
     <message>
         <source>Disable mouse broadcasting</source>
-        <translation type="unfinished"></translation>
+        <translation>关闭鼠标广播</translation>
     </message>
 </context>
 <context>
@@ -600,6 +600,82 @@ Additionally, check you are able to %1 the server config file: %2</source>
     <message>
         <source>&lt;p&gt;Keyboard layout support requires matching layouts on all computers. The following layouts from the other computer are not installed on this computer:&lt;/p&gt;&lt;p&gt;&lt;b&gt;%1&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Please install them to enable support for these layouts.&lt;/p&gt;</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting</source>
+        <translation>鼠标广播</translation>
+    </message>
+    <message>
+        <source>Targets: All</source>
+        <translation>目标：全部</translation>
+    </message>
+    <message>
+        <source>Stop mouse broadcasting</source>
+        <translation>停止鼠标广播</translation>
+    </message>
+    <message>
+        <source>All connected computers</source>
+        <translation>所有已连接的计算机</translation>
+    </message>
+    <message>
+        <source>Broadcast to all connected computers.</source>
+        <translation>广播到所有已连接的计算机。</translation>
+    </message>
+    <message>
+        <source>Targets: %1</source>
+        <translation>目标：%1 个</translation>
+    </message>
+    <message>
+        <source>Broadcast to: %1</source>
+        <translation>广播到：%1</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting could not be changed because the server is not ready.</source>
+        <translation>服务器尚未就绪，无法更改鼠标广播状态。</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting requires a single monitor on the server computer.</source>
+        <translation>鼠标广播要求服务器计算机仅启用一台显示器。</translation>
+    </message>
+    <message>
+        <source>Move the cursor back to the server computer before starting mouse broadcasting.</source>
+        <translation>请先将光标移回服务端主机，再开启鼠标广播。</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting needs at least one selected computer to be connected.</source>
+        <translation>鼠标广播要求至少一台选中的计算机已连接。</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped because the last selected computer disconnected.</source>
+        <translation>最后一台选中的计算机已断开，鼠标广播已停止。</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting started.</source>
+        <translation>鼠标广播已开启。</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped.</source>
+        <translation>鼠标广播已停止。</translation>
+    </message>
+    <message>
+        <source>Start the server to use mouse broadcasting.</source>
+        <translation>请先启动服务器以使用鼠标广播。</translation>
+    </message>
+    <message>
+        <source>Waiting for the server to confirm mouse broadcasting state.</source>
+        <translation>正在等待服务器确认鼠标广播状态。</translation>
+    </message>
+    <message>
+        <source>Connect at least one selected computer to start mouse broadcasting.</source>
+        <translation>请至少连接一台选中的计算机后再开启鼠标广播。</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting keeps the cursor on the server computer until broadcasting is stopped.</source>
+        <translation>鼠标广播开启期间会将光标临时限制在服务端主机，直到关闭广播。</translation>
+    </message>
+    <message>
+        <source>Send mouse movement, clicks, and scrolling to the selected computers.</source>
+        <translation>将鼠标移动、点击和滚动发送到选中的计算机。</translation>
     </message>
 </context>
 <context>

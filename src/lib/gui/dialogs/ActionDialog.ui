@@ -152,7 +152,7 @@
        </property>
        <item>
         <property name="text">
-         <string>Toggle mouse broadcasting</string>
+         <string>Toggle mouse broadcasting (recommended)</string>
         </property>
        </item>
        <item>

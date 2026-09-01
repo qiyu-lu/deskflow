@@ -10,6 +10,7 @@
 
 #include <QObject>
 #include <QSet>
+#include <QStringList>
 
 class QLocalSocket;
 
@@ -23,6 +24,10 @@ public:
   explicit CoreIpcServer(QObject *parent);
 
   static CoreIpcServer &instance();
+
+Q_SIGNALS:
+  void mouseBroadcastRequested(bool enabled, const QStringList &targets);
+  void mouseBroadcastStateRequested();
 
 private:
   void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) override;

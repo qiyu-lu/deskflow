@@ -22,6 +22,8 @@ add_library(common STATIC
   KeySequence.h
   KeySequence.cpp
   LogLevel.h
+  MouseBroadcastProtocol.cpp
+  MouseBroadcastProtocol.h
   NetworkProtocol.h
   PlatformInfo.h
   Settings.h

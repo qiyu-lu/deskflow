@@ -48,6 +48,7 @@
 #include <QRegularExpressionValidator>
 #include <QScreen>
 #include <QScrollBar>
+#include <QToolButton>
 
 #include <memory>
 
@@ -69,6 +70,7 @@ MainWindow::MainWindow()
       m_menuEdit{new QMenu(this)},
       m_menuView{new QMenu(this)},
       m_menuHelp{new QMenu(this)},
+      m_mouseBroadcastTargetsMenu{new QMenu(this)},
       m_actionAbout{new QAction(this)},
       m_actionMinimize{new QAction(this)},
       m_actionQuit{new QAction(this)},
@@ -79,6 +81,7 @@ MainWindow::MainWindow()
       m_actionRestartCore{new QAction(this)},
       m_actionStopCore{new QAction(this)},
       m_actionShowHelp{new QAction(this)},
+      m_actionStopMouseBroadcast{new QAction(this)},
       m_networkMonitor{new NetworkMonitor(this)}
 {
   ui->setupUi(this);
@@ -201,6 +204,7 @@ void MainWindow::setupControls()
 
   ui->btnConfigureServer->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
   ui->btnConfigureClient->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
+  ui->btnMouseBroadcastTargets->setMenu(m_mouseBroadcastTargetsMenu);
 
   if (Settings::value(Settings::Core::LastVersion).toString() != kVersion) {
     Settings::setValue(Settings::Core::LastVersion, kVersion);
@@ -229,6 +233,7 @@ void MainWindow::setupControls()
     ui->btnSaveServerConfig->setIconSize(QSize(22, 22));
   }
   setStatusBar(m_statusBar);
+  rebuildMouseBroadcastTargetMenu();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -273,6 +278,7 @@ void MainWindow::connectSlots()
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
 
   connect(&m_coreProcess, &CoreProcess::connectedClientsChanged, this, &MainWindow::serverClientsChanged);
+  connect(&m_coreProcess, &CoreProcess::mouseBroadcastStateChanged, this, &MainWindow::mouseBroadcastStateChanged);
   connect(&m_coreProcess, &CoreProcess::unrecognisedClient, this, &MainWindow::handleUnrecognisedClient);
   connect(&m_coreProcess, &CoreProcess::connectionRefused, this, &MainWindow::handleConnectionRefused);
   connect(&m_coreProcess, &CoreProcess::retryIn, this, &MainWindow::updateTimeoutDelay);
@@ -293,6 +299,8 @@ void MainWindow::connectSlots()
   connect(ui->btnSaveServerConfig, &QPushButton::clicked, this, &MainWindow::saveServerConfig);
   connect(ui->btnConfigureServer, &QPushButton::clicked, this, [this] { showConfigureServer(""); });
   connect(ui->btnConfigureClient, &QPushButton::clicked, this, [this] { showConfigureClient(); });
+  connect(ui->checkMouseBroadcast, &QCheckBox::clicked, this, &MainWindow::requestMouseBroadcast);
+  connect(m_actionStopMouseBroadcast, &QAction::triggered, this, [this] { requestMouseBroadcast(false); });
   connect(ui->lblComputerName, &QLabel::linkActivated, this, &MainWindow::openSettings);
 
   connect(ui->rbModeServer, &QRadioButton::toggled, this, &MainWindow::coreModeToggled);
@@ -547,6 +555,8 @@ void MainWindow::updateModeControls()
 
   if (isServer || isClient)
     updateModeControlLabels();
+
+  updateMouseBroadcastControls();
 }
 
 void MainWindow::updateModeControlLabels()
@@ -611,6 +621,7 @@ void MainWindow::serverConnectionConfigureClient(const QString &clientName)
   m_serverConfigDialogVisible = true;
   ServerConfigDialog dialog(this, m_serverConfig);
   if (dialog.addClient(clientName) && dialog.exec() == QDialog::Accepted) {
+    rebuildMouseBroadcastTargetMenu();
     m_coreProcess.restart();
   }
   m_serverConfigDialogVisible = false;
@@ -685,7 +696,8 @@ void MainWindow::setupTrayIcon()
 {
   auto trayMenu = new QMenu(this);
   trayMenu->addActions(
-      {m_actionStartCore, m_actionRestartCore, m_actionStopCore, m_actionMinimize, m_actionRestore, m_actionTrayQuit}
+      {m_actionStartCore, m_actionRestartCore, m_actionStopCore, m_actionStopMouseBroadcast, m_actionMinimize,
+       m_actionRestore, m_actionTrayQuit}
   );
   trayMenu->insertSeparator(m_actionMinimize);
   trayMenu->insertSeparator(m_actionTrayQuit);
@@ -714,6 +726,7 @@ void MainWindow::applyConfig()
     m_serverStartSuggestedIP = ip;
   }
 
+  rebuildMouseBroadcastTargetMenu();
   coreModeToggled(true);
 }
 
@@ -948,6 +961,17 @@ void MainWindow::coreProcessStateChanged(ProcessState state)
 {
   using enum ProcessState;
   updateStatus();
+
+  if (state != Started) {
+    m_connectedClients.clear();
+    m_mouseBroadcasting = false;
+    m_mouseBroadcastStateKnown = false;
+    m_mouseBroadcastRequestPending = false;
+    m_mouseBroadcastRequestedEnabled = false;
+    m_statusBar->setServerClients({});
+    rebuildMouseBroadcastTargetMenu();
+  }
+
   if (state == Started) {
     qDebug() << "recording that core has started";
     Settings::setValue(Settings::Gui::AutoStartCore, true);
@@ -982,6 +1006,7 @@ void MainWindow::coreProcessStateChanged(ProcessState state)
     m_actionStopCore->setEnabled(false);
   }
   updateModeControlLabels();
+  updateMouseBroadcastControls();
 }
 
 void MainWindow::coreConnectionStateChanged(ConnectionState state)
@@ -1028,7 +1053,7 @@ void MainWindow::changeEvent(QEvent *e)
     updateModeControlLabels();
     updateNetworkInfo();
     updateStatus();
-    serverClientsChanged({});
+    serverClientsChanged(m_connectedClients);
     updateText();
   }
 }
@@ -1063,6 +1088,7 @@ void MainWindow::updateText()
   m_actionStartCore->setText(tr("&Start"));
   m_actionRestartCore->setText(tr("Rest&art"));
   m_actionStopCore->setText(tr("S&top"));
+  m_actionStopMouseBroadcast->setText(tr("Stop mouse broadcasting"));
   //: %1 will be the replaced with the appname
   m_actionAbout->setText(tr("About %1...").arg(kAppName));
 
@@ -1080,14 +1106,19 @@ void MainWindow::updateText()
     m_actionQuit->setShortcut(QKeySequence(tr("Ctrl+Q")));
     m_actionTrayQuit->setShortcut(QKeySequence(tr("Ctrl+Q")));
   }
+
+  rebuildMouseBroadcastTargetMenu();
 }
 
 void MainWindow::showConfigureServer(const QString &message)
 {
   ServerConfigDialog dialog(this, serverConfig());
   dialog.message(message);
-  if ((dialog.exec() == QDialog::Accepted) && m_coreProcess.isStarted()) {
-    m_coreProcess.restart();
+  if (dialog.exec() == QDialog::Accepted) {
+    rebuildMouseBroadcastTargetMenu();
+    if (m_coreProcess.isStarted()) {
+      m_coreProcess.restart();
+    }
   }
 }
 
@@ -1203,9 +1234,240 @@ bool MainWindow::generateCertificate()
 
 void MainWindow::serverClientsChanged(const QStringList &clients)
 {
-  if (m_coreProcess.mode() != CoreMode::Server || !m_coreProcess.isStarted())
+  m_connectedClients = clients;
+  m_connectedClients.removeAll(QString());
+  m_connectedClients.removeDuplicates();
+  m_connectedClients.sort(Qt::CaseInsensitive);
+
+  if (m_coreProcess.mode() == CoreMode::Server && m_coreProcess.isStarted()) {
+    m_statusBar->setServerClients(m_connectedClients);
+  }
+
+  rebuildMouseBroadcastTargetMenu();
+}
+
+QStringList MainWindow::mouseBroadcastTargets() const
+{
+  auto targets = Settings::value(Settings::Gui::MouseBroadcastTargets).toStringList();
+  targets.removeAll(QString());
+  targets.removeDuplicates();
+  targets.removeIf([this](const auto &target) { return !m_nameRegEx.match(target).hasMatch(); });
+  targets.sort(Qt::CaseInsensitive);
+  return targets;
+}
+
+QStringList MainWindow::availableMouseBroadcastTargets() const
+{
+  QSet<QString> targets;
+  const auto addTarget = [this, &targets](const QString &target) {
+    if (!target.isEmpty() && m_nameRegEx.match(target).hasMatch()) {
+      targets.insert(target);
+    }
+  };
+
+  if (!m_serverConfig.useExternalConfig()) {
+    const auto serverName = m_serverConfig.getServerName();
+    for (const auto &screen : m_serverConfig.screens()) {
+      if (!screen.isNull() && !screen.isServer() && screen.name() != serverName) {
+        addTarget(screen.name());
+      }
+    }
+  }
+
+  for (const auto &client : m_connectedClients) {
+    addTarget(client);
+  }
+  for (const auto &target : mouseBroadcastTargets()) {
+    addTarget(target);
+  }
+
+  QStringList result = targets.values();
+  result.sort(Qt::CaseInsensitive);
+  return result;
+}
+
+bool MainWindow::hasConnectedMouseBroadcastTarget() const
+{
+  const auto selectedTargets = mouseBroadcastTargets();
+  if (selectedTargets.isEmpty()) {
+    return !m_connectedClients.isEmpty();
+  }
+
+  for (const auto &target : selectedTargets) {
+    if (m_connectedClients.contains(target)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void MainWindow::setMouseBroadcastTargets(const QStringList &targets)
+{
+  auto normalized = targets;
+  normalized.removeAll(QString());
+  normalized.removeDuplicates();
+  normalized.removeIf([this](const auto &target) { return !m_nameRegEx.match(target).hasMatch(); });
+  normalized.sort(Qt::CaseInsensitive);
+
+  const auto changed = normalized != mouseBroadcastTargets();
+  Settings::setValue(Settings::Gui::MouseBroadcastTargets, normalized);
+  QTimer::singleShot(0, this, &MainWindow::rebuildMouseBroadcastTargetMenu);
+  updateMouseBroadcastControls();
+
+  if (changed && m_mouseBroadcasting) {
+    requestMouseBroadcast(true);
+  }
+}
+
+void MainWindow::rebuildMouseBroadcastTargetMenu()
+{
+  if (m_mouseBroadcastTargetsMenu == nullptr || ui->btnMouseBroadcastTargets == nullptr) {
     return;
-  m_statusBar->setServerClients(clients);
+  }
+
+  m_mouseBroadcastTargetsMenu->clear();
+  const auto selectedTargets = mouseBroadcastTargets();
+  const auto availableTargets = availableMouseBroadcastTargets();
+
+  auto *allTargets = m_mouseBroadcastTargetsMenu->addAction(tr("All connected computers"));
+  allTargets->setCheckable(true);
+  allTargets->setChecked(selectedTargets.isEmpty());
+  connect(allTargets, &QAction::triggered, this, [this] { setMouseBroadcastTargets({}); });
+
+  if (!availableTargets.isEmpty()) {
+    m_mouseBroadcastTargetsMenu->addSeparator();
+  }
+
+  for (const auto &target : availableTargets) {
+    auto *action = m_mouseBroadcastTargetsMenu->addAction(target);
+    action->setCheckable(true);
+    action->setChecked(selectedTargets.contains(target));
+    connect(action, &QAction::toggled, this, [this, target](bool checked) {
+      auto targets = mouseBroadcastTargets();
+      if (targets.isEmpty()) {
+        if (checked) {
+          targets.append(target);
+        }
+      } else if (checked) {
+        targets.append(target);
+      } else {
+        targets.removeAll(target);
+      }
+      setMouseBroadcastTargets(targets);
+    });
+  }
+
+  if (selectedTargets.isEmpty()) {
+    ui->btnMouseBroadcastTargets->setText(tr("Targets: All"));
+    ui->btnMouseBroadcastTargets->setToolTip(tr("Broadcast to all connected computers."));
+  } else {
+    ui->btnMouseBroadcastTargets->setText(tr("Targets: %1").arg(selectedTargets.size()));
+    ui->btnMouseBroadcastTargets->setToolTip(tr("Broadcast to: %1").arg(selectedTargets.join(", ")));
+  }
+
+  updateMouseBroadcastControls();
+}
+
+void MainWindow::requestMouseBroadcast(bool enabled)
+{
+  if (!m_mouseBroadcastStateKnown || m_mouseBroadcastRequestPending) {
+    updateMouseBroadcastControls();
+    return;
+  }
+
+  m_mouseBroadcastRequestPending = true;
+  m_mouseBroadcastRequestedEnabled = enabled;
+  updateMouseBroadcastControls();
+
+  if (!m_coreProcess.setMouseBroadcast(enabled, mouseBroadcastTargets())) {
+    m_mouseBroadcastRequestPending = false;
+    m_mouseBroadcastRequestedEnabled = m_mouseBroadcasting;
+    updateMouseBroadcastControls();
+    m_trayIcon->showMessage(
+        kAppName, tr("Mouse broadcasting could not be changed because the server is not ready."),
+        QSystemTrayIcon::Information
+    );
+  }
+}
+
+QString MainWindow::mouseBroadcastReasonText(const QString &reason) const
+{
+  if (reason == QStringLiteral("multipleMonitors")) {
+    return tr("Mouse broadcasting requires a single monitor on the server computer.");
+  }
+  if (reason == QStringLiteral("cursorNotOnServer")) {
+    return tr("Move the cursor back to the server computer before starting mouse broadcasting.");
+  }
+  if (reason == QStringLiteral("noTargets")) {
+    return tr("Mouse broadcasting needs at least one selected computer to be connected.");
+  }
+  if (reason == QStringLiteral("targetDisconnected")) {
+    return tr("Mouse broadcasting stopped because the last selected computer disconnected.");
+  }
+  if (reason == QStringLiteral("serverUnavailable")) {
+    return tr("Mouse broadcasting could not be changed because the server is not ready.");
+  }
+  return QString();
+}
+
+void MainWindow::mouseBroadcastStateChanged(bool enabled, const QStringList &targets, const QString &reason)
+{
+  const bool stateWasKnown = m_mouseBroadcastStateKnown;
+  const bool wasEnabled = m_mouseBroadcasting;
+  const bool requestWasPending = m_mouseBroadcastRequestPending;
+
+  if (enabled || wasEnabled || requestWasPending) {
+    Settings::setValue(Settings::Gui::MouseBroadcastTargets, targets);
+  }
+
+  m_mouseBroadcastStateKnown = true;
+  m_mouseBroadcasting = enabled;
+  m_mouseBroadcastRequestPending = false;
+  m_mouseBroadcastRequestedEnabled = enabled;
+  rebuildMouseBroadcastTargetMenu();
+
+  QString notification = mouseBroadcastReasonText(reason);
+  if (notification.isEmpty() && stateWasKnown && wasEnabled != enabled) {
+    notification = enabled ? tr("Mouse broadcasting started.") : tr("Mouse broadcasting stopped.");
+  }
+
+  if (!notification.isEmpty() && (stateWasKnown || requestWasPending)) {
+    m_trayIcon->showMessage(kAppName, notification, QSystemTrayIcon::Information);
+  }
+}
+
+void MainWindow::updateMouseBroadcastControls()
+{
+  const bool isServer = m_coreProcess.mode() == CoreMode::Server;
+  const bool isStarted = m_coreProcess.isStarted();
+  const bool hasConnectedTarget = hasConnectedMouseBroadcastTarget();
+  const bool canToggle = isServer && isStarted && m_mouseBroadcastStateKnown && !m_mouseBroadcastRequestPending &&
+                         (hasConnectedTarget || m_mouseBroadcasting);
+
+  ui->checkMouseBroadcast->setChecked(
+      m_mouseBroadcastRequestPending ? m_mouseBroadcastRequestedEnabled : m_mouseBroadcasting
+  );
+  ui->checkMouseBroadcast->setEnabled(canToggle);
+  ui->btnMouseBroadcastTargets->setEnabled(
+      isServer && !m_mouseBroadcastRequestPending && !availableMouseBroadcastTargets().isEmpty()
+  );
+
+  if (!isStarted) {
+    ui->checkMouseBroadcast->setToolTip(tr("Start the server to use mouse broadcasting."));
+  } else if (!m_mouseBroadcastStateKnown || m_mouseBroadcastRequestPending) {
+    ui->checkMouseBroadcast->setToolTip(tr("Waiting for the server to confirm mouse broadcasting state."));
+  } else if (!hasConnectedTarget && !m_mouseBroadcasting) {
+    ui->checkMouseBroadcast->setToolTip(tr("Connect at least one selected computer to start mouse broadcasting."));
+  } else if (m_mouseBroadcasting) {
+    ui->checkMouseBroadcast->setToolTip(
+        tr("Mouse broadcasting keeps the cursor on the server computer until broadcasting is stopped.")
+    );
+  } else {
+    ui->checkMouseBroadcast->setToolTip(tr("Send mouse movement, clicks, and scrolling to the selected computers."));
+  }
+
+  m_actionStopMouseBroadcast->setVisible(isServer && m_mouseBroadcasting);
+  m_actionStopMouseBroadcast->setEnabled(!m_mouseBroadcastRequestPending);
 }
 
 void MainWindow::daemonIpcClientConnectionFailed()

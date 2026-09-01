@@ -12,9 +12,11 @@
 #include "base/IEventQueue.h"
 #include "base/Log.h"
 #include "common/ExitCodes.h"
+#include "common/MouseBroadcastProtocol.h"
 #include "common/PlatformInfo.h"
 #include "common/Settings.h"
 #include "deskflow/App.h"
+#include "deskflow/IKeyState.h"
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/Screen.h"
 #include "deskflow/ScreenException.h"
@@ -48,8 +50,25 @@
 #endif
 
 #include <fstream>
+#include <set>
 
 using namespace deskflow::server;
+
+namespace {
+
+class MouseBroadcastRequest : public EventData
+{
+public:
+  MouseBroadcastRequest(bool enabled, const QStringList &targets) : m_enabled(enabled), m_targets(targets)
+  {
+    // do nothing
+  }
+
+  bool m_enabled;
+  QStringList m_targets;
+};
+
+} // namespace
 
 //
 // ServerApp
@@ -92,6 +111,17 @@ void ServerApp::reloadConfig()
     }
     LOG_INFO("reloaded configuration");
   }
+}
+
+void ServerApp::requestMouseBroadcast(bool enabled, const QStringList &targets)
+{
+  auto *request = new MouseBroadcastRequest(enabled, targets);
+  getEvents()->addEvent(Event(EventTypes::ServerAppMouseBroadcast, getEvents()->getSystemTarget(), request));
+}
+
+void ServerApp::requestMouseBroadcastState()
+{
+  getEvents()->addEvent(Event(EventTypes::ServerAppMouseBroadcastState, getEvents()->getSystemTarget()));
 }
 
 void ServerApp::loadConfig()
@@ -373,6 +403,7 @@ bool ServerApp::startServer()
     m_listener = listener;
     LOG_DEBUG("started server, waiting for clients");
     ipcSendConnectionState(deskflow::core::ConnectionState::Listening);
+    m_server->sendMouseBroadcastStateIpc();
     m_serverState = Started;
     return true;
   } catch (SocketAddressInUseException &e) {
@@ -542,6 +573,33 @@ int ServerApp::mainLoop()
   getEvents()->addHandler(EventTypes::ServerAppResetServer, getEvents()->getSystemTarget(), [this](const auto &) {
     resetServer();
   });
+  getEvents()->addHandler(EventTypes::ServerAppMouseBroadcast, getEvents()->getSystemTarget(), [this](const auto &e) {
+    const auto *request = static_cast<const MouseBroadcastRequest *>(e.getDataObject());
+    if (m_server == nullptr) {
+      ipcSendToClient(
+          QStringLiteral("mouseBroadcastState"),
+          deskflow::mouse_broadcast::formatState(false, request->m_targets, QStringLiteral("serverUnavailable"))
+      );
+      return;
+    }
+
+    std::set<std::string> targets;
+    for (const auto &target : request->m_targets) {
+      targets.insert(target.toStdString());
+    }
+    m_server->setMouseBroadcast(
+        request->m_enabled ? Server::MouseBroadcastInfo::kOn : Server::MouseBroadcastInfo::kOff,
+        IKeyState::KeyInfo::join(targets)
+    );
+  });
+  getEvents()->addHandler(
+      EventTypes::ServerAppMouseBroadcastState, getEvents()->getSystemTarget(),
+      [this](const auto &) {
+        if (m_server != nullptr) {
+          m_server->sendMouseBroadcastStateIpc();
+        }
+      }
+  );
 
   // run event loop.  if startServer() failed we're supposed to retry
   // later.  the timer installed by startServer() will take care of
@@ -552,6 +610,8 @@ int ServerApp::mainLoop()
   LOG_DEBUG("stopping server");
   getEvents()->removeHandler(EventTypes::ServerAppForceReconnect, getEvents()->getSystemTarget());
   getEvents()->removeHandler(EventTypes::ServerAppReloadConfig, getEvents()->getSystemTarget());
+  getEvents()->removeHandler(EventTypes::ServerAppMouseBroadcast, getEvents()->getSystemTarget());
+  getEvents()->removeHandler(EventTypes::ServerAppMouseBroadcastState, getEvents()->getSystemTarget());
   cleanupServer();
   LOG_INFO("stopped server");
 

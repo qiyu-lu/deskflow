@@ -406,6 +406,8 @@ Actions are two lists of individual actions separated by commas. The two lists a
 
 * `mouseBroadcast(mode[,computers])`
 : Mirrors the primary computer's pointer position, mouse buttons, and wheel events to the selected client computers while the pointer remains on the primary computer. Positions are scaled to each client's screen dimensions. ''mode'' can be ''off'', ''on'', or ''toggle''; the default is ''toggle''. If ''computers'' is omitted, all connected clients are selected. Otherwise, use ''*'' or a '':'' (colon) separated list of computer names, for example `mouseBroadcast(toggle,client1:client2)`.
+: For a single hotkey, use ''toggle'' so the first press enables broadcasting and the next press disables it. The server GUI also provides a runtime checkbox and target selector. Broadcasting is not restored automatically after restarting the server, and it stops if the last selected connected client disconnects.
+: Broadcasting can only start while the pointer is on the server computer. While enabled, the pointer is temporarily kept on the server and edge switching and screen-switch actions are ignored. Disabling broadcasting immediately restores ordinary screen switching without changing the user's saved cursor-lock setting.
 
 * `lockCursorToScreen(mode)`
 : Locks the cursor to or unlocks the cursor from the active computer. ''mode'' can be ''off'' to unlock the cursor, ''on'' to lock the cursor, or ''toggle'' to toggle the current state. The default is ''toggle''. If the configuration has no ''lockCursorToScreen'' action and ''Scroll Lock'' is not used as a hot key then ''Scroll Lock'' toggles cursor locking.

@@ -307,6 +307,29 @@
                </property>
               </spacer>
              </item>
+             <item>
+              <widget class="QCheckBox" name="checkMouseBroadcast">
+               <property name="text">
+                <string>Mouse broadcasting</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="btnMouseBroadcastTargets">
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+               <property name="text">
+                <string>Targets: All</string>
+               </property>
+               <property name="popupMode">
+                <enum>QToolButton::ToolButtonPopupMode::InstantPopup</enum>
+               </property>
+              </widget>
+             </item>
             </layout>
            </widget>
           </item>

@@ -33,7 +33,11 @@ namespace deskflow::server {
 int32_t mapMouseBroadcastCoordinate(
     int32_t value, int32_t sourceOrigin, int32_t sourceSize, int32_t targetOrigin, int32_t targetSize
 );
-}
+bool isMouseBroadcastStartAllowed(bool activeOnPrimary, bool screensaverActive);
+bool shouldBlockMouseBroadcastScreenSwitch(
+    bool broadcasting, bool forScreensaver, bool activeOnPrimary, bool destinationIsPrimary
+);
+} // namespace deskflow::server
 class IEventQueue;
 class Thread;
 class ClientListener;
@@ -201,6 +205,12 @@ public:
   */
   void disconnect();
 
+  //! Change mouse broadcasting state
+  void setMouseBroadcast(MouseBroadcastInfo::State state, const std::string &screens);
+
+  //! Send the authoritative mouse broadcasting state to the GUI
+  void sendMouseBroadcastStateIpc(const char *reason = "") const;
+
   //! Store ClientListener pointer
   void setListener(ClientListener *p)
   {
@@ -357,6 +367,9 @@ private:
   void handleLockCursorToScreenEvent(const Event &event);
 
   bool isMouseBroadcastTarget(const std::string &name) const;
+  bool isMouseBroadcastTarget(const std::string &name, const std::string &screens) const;
+  bool hasConnectedMouseBroadcastTarget(const std::string &screens) const;
+  void updateMouseBroadcast(MouseBroadcastInfo::State state, const std::string &screens, const char *reason);
   void mapMouseBroadcastPosition(
       const BaseClientProxy *target, int32_t sourceX, int32_t sourceY, int32_t &targetX, int32_t &targetY
   ) const;

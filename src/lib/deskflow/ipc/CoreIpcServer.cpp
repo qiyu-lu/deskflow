@@ -8,6 +8,7 @@
 
 #include "base/Log.h"
 #include "common/Constants.h"
+#include "common/MouseBroadcastProtocol.h"
 
 #include <QLocalSocket>
 
@@ -29,7 +30,6 @@ CoreIpcServer &CoreIpcServer::instance()
 
 void CoreIpcServer::processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts)
 {
-  Q_UNUSED(parts)
   if (command == QStringLiteral("stop")) {
     LOG_DEBUG("core ipc server got stop message");
     writeToClientSocket(clientSocket, QStringLiteral("ok"));
@@ -37,6 +37,36 @@ void CoreIpcServer::processCommand(QLocalSocket *clientSocket, const QString &co
     Q_EMIT stopProcessRequested();
     return;
   }
+
+  if (command == QStringLiteral("mouseBroadcast")) {
+    if (parts.size() != 2) {
+      LOG_WARN("core ipc server got invalid mouse broadcast request");
+      writeToClientSocket(clientSocket, QStringLiteral("error=invalid mouse broadcast request"));
+      return;
+    }
+
+    const auto request = deskflow::mouse_broadcast::parseRequest(parts.at(1));
+    if (!request.has_value()) {
+      LOG_WARN("core ipc server got invalid mouse broadcast payload");
+      writeToClientSocket(clientSocket, QStringLiteral("error=invalid mouse broadcast payload"));
+      return;
+    }
+
+    Q_EMIT mouseBroadcastRequested(request->enabled, request->targets);
+    return;
+  }
+
+  if (command == QStringLiteral("getMouseBroadcastState")) {
+    if (parts.size() != 1) {
+      LOG_WARN("core ipc server got invalid mouse broadcast state request");
+      writeToClientSocket(clientSocket, QStringLiteral("error=invalid mouse broadcast state request"));
+      return;
+    }
+
+    Q_EMIT mouseBroadcastStateRequested();
+    return;
+  }
+
   LOG_WARN("core ipc server got unknown command: %s", command.toUtf8().constData());
 }
 
