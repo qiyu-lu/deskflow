@@ -131,7 +131,8 @@ private:
 
   bool detectXI2();
 #ifdef HAVE_XI2
-  void selectXIRawPointerEvents();
+  void selectXIRawInputEvents();
+  void onKeyRaw(unsigned int keycode, bool press);
   void onMouseRawButton(unsigned int button, bool press);
 #endif
   void selectEvents(Window) const;

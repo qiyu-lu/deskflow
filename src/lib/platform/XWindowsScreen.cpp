@@ -119,7 +119,7 @@ XWindowsScreen::XWindowsScreen(const char *displayName, bool isPrimary, IEventQu
 #ifdef HAVE_XI2
     m_xi2detected = detectXI2();
     if (m_xi2detected) {
-      selectXIRawPointerEvents();
+      selectXIRawInputEvents();
     } else
 #endif
     {
@@ -1169,9 +1169,9 @@ void XWindowsScreen::handleSystemEvent(const Event &event)
 
 #ifdef HAVE_XI2
   if (m_xi2detected) {
-    // Process raw pointer events. Raw buttons are only needed while the
-    // pointer is on the primary screen. Once the pointer leaves, the grab
-    // window receives the corresponding core button events instead.
+    // Process raw input while the pointer is on the primary screen. Once the
+    // pointer leaves, the grab window receives the corresponding core events
+    // instead.
     auto *cookie = &xevent->xcookie;
     if (XGetEventData(m_display, cookie) && cookie->type == GenericEvent && cookie->extension == xi_opcode) {
       if (cookie->evtype == XI_RawMotion) {
@@ -1188,6 +1188,12 @@ void XWindowsScreen::handleSystemEvent(const Event &event)
             &xmotion.y, &msk
         );
         onMouseMove(xmotion);
+        XFreeEventData(m_display, cookie);
+        return;
+      }
+      if (m_isOnScreen && (cookie->evtype == XI_RawKeyPress || cookie->evtype == XI_RawKeyRelease)) {
+        const auto *rawEvent = static_cast<const XIRawEvent *>(cookie->data);
+        onKeyRaw(rawEvent->detail, cookie->evtype == XI_RawKeyPress);
         XFreeEventData(m_display, cookie);
         return;
       }
@@ -1487,6 +1493,71 @@ void XWindowsScreen::onMouseRelease(const XButtonEvent &xbutton)
 }
 
 #ifdef HAVE_XI2
+void XWindowsScreen::onKeyRaw(unsigned int keycode, bool press)
+{
+  if (keycode == 0) {
+    LOG_VERBOSE("event: raw key has no keycode");
+    return;
+  }
+
+  // XI raw key events do not include modifier state. Reconstruct the state
+  // from the last event before polling the new state below. This preserves
+  // the same pre-event modifier semantics as a core XKeyEvent.
+  const auto mask = m_keyState->getActiveModifiers();
+  unsigned int xState = 0;
+  if (!m_keyState->mapModifiersToX(mask, xState)) {
+    LOG_VERBOSE("event: failed to map raw key modifiers, using no modifiers");
+    xState = 0;
+  }
+#if HAVE_XKB_EXTENSION
+  if (m_xkb) {
+    xState = XkbBuildCoreState(xState, m_keyState->pollActiveGroup());
+  }
+#endif
+
+  XKeyEvent xkey{};
+  // Bypass XIM text composition: keyboard broadcast intentionally carries
+  // physical key events and does not promise cross-IME text equivalence.
+  xkey.type = KeyRelease;
+  xkey.display = m_display;
+  xkey.window = m_root;
+  xkey.root = m_root;
+  xkey.time = CurrentTime;
+  xkey.state = xState;
+  xkey.keycode = static_cast<KeyCode>(keycode);
+  xkey.same_screen = True;
+
+  const auto button = static_cast<KeyButton>(keycode);
+  const bool isRepeat = press && m_keyState->isKeyDown(button);
+  const auto currentMask = m_keyState->pollActiveModifiers();
+  m_keyState->onKey(button, press, currentMask);
+
+  // Registered hotkeys are delivered separately as core events. Do not also
+  // relay their trigger key through the raw-input path.
+  if (press && m_hotKeyToIDMap.contains(HotKeyItem(keycode, xState & 0xffu))) {
+    LOG_VERBOSE("event: raw key is a registered hotkey, awaiting core event");
+    return;
+  }
+
+  KeyID key = mapKeyFromX(&xkey);
+  if (key == kKeyNone) {
+    LOG_VERBOSE("can't map raw keycode to key id");
+    return;
+  }
+
+  if ((key == kKeyPause || key == kKeyBreak) &&
+      (mask & (KeyModifierControl | KeyModifierAlt)) == (KeyModifierControl | KeyModifierAlt)) {
+    LOG_DEBUG("emulate ctrl+alt+del");
+    key = kKeyDelete;
+  }
+
+  LOG_VERBOSE(
+      "event: raw key %s%s code=%u state=0x%04x", press ? "press" : "release", isRepeat ? " (repeat)" : "", keycode,
+      xState
+  );
+  m_keyState->sendKeyEvent(getEventTarget(), press, isRepeat, key, mask, 1, button);
+}
+
 void XWindowsScreen::onMouseRawButton(unsigned int button, bool press)
 {
   XButtonEvent xbutton{};
@@ -1980,7 +2051,7 @@ bool XWindowsScreen::detectXI2()
 }
 
 #ifdef HAVE_XI2
-void XWindowsScreen::selectXIRawPointerEvents()
+void XWindowsScreen::selectXIRawInputEvents()
 {
   XIEventMask mask;
 
@@ -1988,6 +2059,8 @@ void XWindowsScreen::selectXIRawPointerEvents()
   mask.mask = (unsigned char *)calloc(mask.mask_len, sizeof(char));
   mask.deviceid = XIAllMasterDevices;
   memset(mask.mask, 0, mask.mask_len);
+  XISetMask(mask.mask, XI_RawKeyPress);
+  XISetMask(mask.mask, XI_RawKeyRelease);
   XISetMask(mask.mask, XI_RawButtonPress);
   XISetMask(mask.mask, XI_RawButtonRelease);
   XISetMask(mask.mask, XI_RawMotion);
