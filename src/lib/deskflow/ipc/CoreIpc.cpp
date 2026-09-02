@@ -26,3 +26,12 @@ void ipcSendConnectionState(deskflow::core::ConnectionState state)
   const auto metaEnum = QMetaEnum::fromType<deskflow::core::ConnectionState>();
   ipcSendToClient(QStringLiteral("connectionState"), metaEnum.valueToKey(static_cast<int>(state)));
 }
+
+void ipcSendInputBroadcastState(uint8_t modes)
+{
+  auto &server = deskflow::core::ipc::CoreIpcServer::instance();
+  QMetaObject::invokeMethod(
+      &server, [modes] { deskflow::core::ipc::CoreIpcServer::instance().setInputBroadcastState(modes); },
+      Qt::QueuedConnection
+  );
+}

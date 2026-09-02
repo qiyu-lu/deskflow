@@ -92,6 +92,7 @@ public:
   void setOptions(const OptionsList &options) override;
   void setSequenceNumber(uint32_t) override;
   bool isPrimary() const override;
+  bool hasMultipleMonitors() const override;
   std::string getSecureInputApp() const override;
 
   void waitForCarbonLoop() const;
@@ -231,6 +232,7 @@ private:
   int32_t m_x, m_y;
   int32_t m_w, m_h;
   int32_t m_xCenter, m_yCenter;
+  bool m_multimon = false;
 
   // mouse state
   mutable int32_t m_xCursor, m_yCursor;

@@ -75,6 +75,7 @@ public:
   void setOptions(const OptionsList &options) override;
   void setSequenceNumber(uint32_t) override;
   bool isPrimary() const override;
+  bool hasMultipleMonitors() const override;
   std::string getSecureInputApp() const override;
 
 protected:
@@ -130,7 +131,9 @@ private:
 
   bool detectXI2();
 #ifdef HAVE_XI2
-  void selectXIRawMotion();
+  void selectXIRawInputEvents();
+  void onKeyRaw(unsigned int keycode, bool press);
+  void onMouseRawButton(unsigned int button, bool press);
 #endif
   void selectEvents(Window) const;
   void doSelectEvents(Window) const;
@@ -224,7 +227,7 @@ private:
   // especially if screen 0 is not at 0,0 or if faking a motion on
   // a screen other than screen 0.
   bool m_xtestIsXineramaUnaware = true;
-  bool m_xinerama;
+  bool m_xinerama = false;
 
   // stuff to work around lost focus issues on certain systems
   // (ie: a MythTV front-end).

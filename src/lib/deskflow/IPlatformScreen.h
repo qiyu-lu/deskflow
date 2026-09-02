@@ -145,6 +145,12 @@ public:
   */
   virtual bool isPrimary() const = 0;
 
+  //! Test if the desktop spans multiple monitors
+  /*!
+  Return true iff this screen currently has more than one monitor.
+  */
+  virtual bool hasMultipleMonitors() const = 0;
+
   //@}
   // IKeyState overrides
   void fakeKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang) override = 0;

@@ -29,6 +29,7 @@ public:
   void updateSecurityInfo(bool encrypted);
   void setSecurityIcon(bool encrypted);
   void setSecurityLevel(const QString &securityLevel);
+  void setInputBroadcastState(int modes, bool isServer);
   void setBtnFingerprintVisible(bool visible);
   void updateFound(const QString &version);
 
@@ -44,10 +45,13 @@ private:
   void updateTimerLabel();
   QPushButton *m_btnFingerprint = nullptr;
   QLabel *m_lblSecurityIcon = nullptr;
+  QLabel *m_lblInputBroadcast = nullptr;
   QLabel *m_lblStatus = nullptr;
   QPushButton *m_btnUpdate = nullptr;
   bool m_encrypted = false;
   QString m_securityLevel;
+  int m_inputBroadcastModes = 0;
+  bool m_inputBroadcastIsServer = false;
   int m_connectionInterval = -1;
   QTimer *m_retryTimer = nullptr;
 };

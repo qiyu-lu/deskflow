@@ -7,6 +7,8 @@
 #include "CoreIpcClient.h"
 
 #include "common/Constants.h"
+#include "common/KeyboardBroadcastProtocol.h"
+#include "common/MouseBroadcastProtocol.h"
 
 #include <QString>
 
@@ -15,6 +17,32 @@ namespace deskflow::gui::ipc {
 CoreIpcClient::CoreIpcClient(QObject *parent) : IpcClient(parent, kCoreIpcName, QStringLiteral("core"))
 {
   // do nothing
+}
+
+void CoreIpcClient::requestMouseBroadcastState()
+{
+  sendMessage(QStringLiteral("getMouseBroadcastState"));
+}
+
+void CoreIpcClient::sendMouseBroadcast(bool enabled, const QStringList &targets)
+{
+  sendMessage(QStringLiteral("mouseBroadcast=%1").arg(deskflow::mouse_broadcast::formatRequest(enabled, targets)));
+}
+
+void CoreIpcClient::requestKeyboardBroadcastState()
+{
+  sendMessage(QStringLiteral("getKeyboardBroadcastState"));
+}
+
+void CoreIpcClient::sendKeyboardBroadcast(bool enabled, const QStringList &targets)
+{
+  sendMessage(QStringLiteral("keyboardBroadcast=%1").arg(deskflow::keyboard_broadcast::formatRequest(enabled, targets))
+  );
+}
+
+void CoreIpcClient::requestInputBroadcastState()
+{
+  sendMessage(QStringLiteral("getInputBroadcastState"));
 }
 
 void CoreIpcClient::sendStop()

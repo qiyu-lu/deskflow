@@ -20,6 +20,7 @@
 #include "dialogs/ServerConfigDialog.h"
 #include "dialogs/SettingsDialog.h"
 
+#include "common/InputBroadcast.h"
 #include "common/PlatformInfo.h"
 #include "common/Settings.h"
 #include "common/UrlConstants.h"
@@ -48,6 +49,7 @@
 #include <QRegularExpressionValidator>
 #include <QScreen>
 #include <QScrollBar>
+#include <QToolButton>
 
 #include <memory>
 
@@ -69,6 +71,7 @@ MainWindow::MainWindow()
       m_menuEdit{new QMenu(this)},
       m_menuView{new QMenu(this)},
       m_menuHelp{new QMenu(this)},
+      m_mouseBroadcastTargetsMenu{new QMenu(this)},
       m_actionAbout{new QAction(this)},
       m_actionMinimize{new QAction(this)},
       m_actionQuit{new QAction(this)},
@@ -79,6 +82,7 @@ MainWindow::MainWindow()
       m_actionRestartCore{new QAction(this)},
       m_actionStopCore{new QAction(this)},
       m_actionShowHelp{new QAction(this)},
+      m_actionStopInputBroadcast{new QAction(this)},
       m_networkMonitor{new NetworkMonitor(this)}
 {
   ui->setupUi(this);
@@ -201,6 +205,7 @@ void MainWindow::setupControls()
 
   ui->btnConfigureServer->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
   ui->btnConfigureClient->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
+  ui->btnMouseBroadcastTargets->setMenu(m_mouseBroadcastTargetsMenu);
 
   if (Settings::value(Settings::Core::LastVersion).toString() != kVersion) {
     Settings::setValue(Settings::Core::LastVersion, kVersion);
@@ -229,6 +234,7 @@ void MainWindow::setupControls()
     ui->btnSaveServerConfig->setIconSize(QSize(22, 22));
   }
   setStatusBar(m_statusBar);
+  rebuildMouseBroadcastTargetMenu();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -273,6 +279,11 @@ void MainWindow::connectSlots()
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
 
   connect(&m_coreProcess, &CoreProcess::connectedClientsChanged, this, &MainWindow::serverClientsChanged);
+  connect(&m_coreProcess, &CoreProcess::mouseBroadcastStateChanged, this, &MainWindow::mouseBroadcastStateChanged);
+  connect(
+      &m_coreProcess, &CoreProcess::keyboardBroadcastStateChanged, this, &MainWindow::keyboardBroadcastStateChanged
+  );
+  connect(&m_coreProcess, &CoreProcess::inputBroadcastStateChanged, this, &MainWindow::inputBroadcastStateChanged);
   connect(&m_coreProcess, &CoreProcess::unrecognisedClient, this, &MainWindow::handleUnrecognisedClient);
   connect(&m_coreProcess, &CoreProcess::connectionRefused, this, &MainWindow::handleConnectionRefused);
   connect(&m_coreProcess, &CoreProcess::retryIn, this, &MainWindow::updateTimeoutDelay);
@@ -293,6 +304,16 @@ void MainWindow::connectSlots()
   connect(ui->btnSaveServerConfig, &QPushButton::clicked, this, &MainWindow::saveServerConfig);
   connect(ui->btnConfigureServer, &QPushButton::clicked, this, [this] { showConfigureServer(""); });
   connect(ui->btnConfigureClient, &QPushButton::clicked, this, [this] { showConfigureClient(); });
+  connect(ui->checkMouseBroadcast, &QCheckBox::clicked, this, &MainWindow::requestMouseBroadcast);
+  connect(ui->checkKeyboardBroadcast, &QCheckBox::clicked, this, &MainWindow::requestKeyboardBroadcast);
+  connect(m_actionStopInputBroadcast, &QAction::triggered, this, [this] {
+    if (m_mouseBroadcasting) {
+      requestMouseBroadcast(false);
+    }
+    if (m_keyboardBroadcasting) {
+      requestKeyboardBroadcast(false);
+    }
+  });
   connect(ui->lblComputerName, &QLabel::linkActivated, this, &MainWindow::openSettings);
 
   connect(ui->rbModeServer, &QRadioButton::toggled, this, &MainWindow::coreModeToggled);
@@ -547,6 +568,9 @@ void MainWindow::updateModeControls()
 
   if (isServer || isClient)
     updateModeControlLabels();
+
+  updateMouseBroadcastControls();
+  updateInputBroadcastStatus();
 }
 
 void MainWindow::updateModeControlLabels()
@@ -611,6 +635,7 @@ void MainWindow::serverConnectionConfigureClient(const QString &clientName)
   m_serverConfigDialogVisible = true;
   ServerConfigDialog dialog(this, m_serverConfig);
   if (dialog.addClient(clientName) && dialog.exec() == QDialog::Accepted) {
+    rebuildMouseBroadcastTargetMenu();
     m_coreProcess.restart();
   }
   m_serverConfigDialogVisible = false;
@@ -685,7 +710,8 @@ void MainWindow::setupTrayIcon()
 {
   auto trayMenu = new QMenu(this);
   trayMenu->addActions(
-      {m_actionStartCore, m_actionRestartCore, m_actionStopCore, m_actionMinimize, m_actionRestore, m_actionTrayQuit}
+      {m_actionStartCore, m_actionRestartCore, m_actionStopCore, m_actionStopInputBroadcast, m_actionMinimize,
+       m_actionRestore, m_actionTrayQuit}
   );
   trayMenu->insertSeparator(m_actionMinimize);
   trayMenu->insertSeparator(m_actionTrayQuit);
@@ -714,6 +740,7 @@ void MainWindow::applyConfig()
     m_serverStartSuggestedIP = ip;
   }
 
+  rebuildMouseBroadcastTargetMenu();
   coreModeToggled(true);
 }
 
@@ -948,6 +975,24 @@ void MainWindow::coreProcessStateChanged(ProcessState state)
 {
   using enum ProcessState;
   updateStatus();
+
+  if (state != Started) {
+    m_connectedClients.clear();
+    m_mouseBroadcasting = false;
+    m_mouseBroadcastStateKnown = false;
+    m_mouseBroadcastRequestPending = false;
+    m_mouseBroadcastRequestedEnabled = false;
+    m_keyboardBroadcasting = false;
+    m_keyboardBroadcastStateKnown = false;
+    m_keyboardBroadcastRequestPending = false;
+    m_keyboardBroadcastRequestedEnabled = false;
+    m_inputBroadcastModes = 0;
+    m_inputBroadcastStateKnown = false;
+    m_statusBar->setServerClients({});
+    rebuildMouseBroadcastTargetMenu();
+    updateInputBroadcastStatus();
+  }
+
   if (state == Started) {
     qDebug() << "recording that core has started";
     Settings::setValue(Settings::Gui::AutoStartCore, true);
@@ -982,6 +1027,8 @@ void MainWindow::coreProcessStateChanged(ProcessState state)
     m_actionStopCore->setEnabled(false);
   }
   updateModeControlLabels();
+  updateMouseBroadcastControls();
+  updateInputBroadcastStatus();
 }
 
 void MainWindow::coreConnectionStateChanged(ConnectionState state)
@@ -995,6 +1042,11 @@ void MainWindow::coreConnectionStateChanged(ConnectionState state)
   // when the correct TLS version string is detected.
   if (state != ConnectionState::Connected) {
     secureSocket(false);
+    if (m_coreProcess.mode() == CoreMode::Client) {
+      m_inputBroadcastModes = 0;
+      m_inputBroadcastStateKnown = false;
+      updateInputBroadcastStatus();
+    }
   } else if (isVisible()) {
     showFirstConnectedMessage();
   }
@@ -1028,7 +1080,7 @@ void MainWindow::changeEvent(QEvent *e)
     updateModeControlLabels();
     updateNetworkInfo();
     updateStatus();
-    serverClientsChanged({});
+    serverClientsChanged(m_connectedClients);
     updateText();
   }
 }
@@ -1063,6 +1115,7 @@ void MainWindow::updateText()
   m_actionStartCore->setText(tr("&Start"));
   m_actionRestartCore->setText(tr("Rest&art"));
   m_actionStopCore->setText(tr("S&top"));
+  m_actionStopInputBroadcast->setText(tr("Stop all input broadcasting"));
   //: %1 will be the replaced with the appname
   m_actionAbout->setText(tr("About %1...").arg(kAppName));
 
@@ -1080,14 +1133,19 @@ void MainWindow::updateText()
     m_actionQuit->setShortcut(QKeySequence(tr("Ctrl+Q")));
     m_actionTrayQuit->setShortcut(QKeySequence(tr("Ctrl+Q")));
   }
+
+  rebuildMouseBroadcastTargetMenu();
 }
 
 void MainWindow::showConfigureServer(const QString &message)
 {
   ServerConfigDialog dialog(this, serverConfig());
   dialog.message(message);
-  if ((dialog.exec() == QDialog::Accepted) && m_coreProcess.isStarted()) {
-    m_coreProcess.restart();
+  if (dialog.exec() == QDialog::Accepted) {
+    rebuildMouseBroadcastTargetMenu();
+    if (m_coreProcess.isStarted()) {
+      m_coreProcess.restart();
+    }
   }
 }
 
@@ -1203,9 +1261,388 @@ bool MainWindow::generateCertificate()
 
 void MainWindow::serverClientsChanged(const QStringList &clients)
 {
-  if (m_coreProcess.mode() != CoreMode::Server || !m_coreProcess.isStarted())
+  m_connectedClients = clients;
+  m_connectedClients.removeAll(QString());
+  m_connectedClients.removeDuplicates();
+  m_connectedClients.sort(Qt::CaseInsensitive);
+
+  if (m_coreProcess.mode() == CoreMode::Server && m_coreProcess.isStarted()) {
+    m_statusBar->setServerClients(m_connectedClients);
+  }
+
+  rebuildMouseBroadcastTargetMenu();
+}
+
+QStringList MainWindow::mouseBroadcastTargets() const
+{
+  auto targets = Settings::value(Settings::Gui::MouseBroadcastTargets).toStringList();
+  targets.removeAll(QString());
+  targets.removeDuplicates();
+  targets.removeIf([this](const auto &target) { return !m_nameRegEx.match(target).hasMatch(); });
+  targets.sort(Qt::CaseInsensitive);
+  return targets;
+}
+
+QStringList MainWindow::availableMouseBroadcastTargets() const
+{
+  QSet<QString> targets;
+  const auto addTarget = [this, &targets](const QString &target) {
+    if (!target.isEmpty() && m_nameRegEx.match(target).hasMatch()) {
+      targets.insert(target);
+    }
+  };
+
+  if (!m_serverConfig.useExternalConfig()) {
+    const auto serverName = m_serverConfig.getServerName();
+    for (const auto &screen : m_serverConfig.screens()) {
+      if (!screen.isNull() && !screen.isServer() && screen.name() != serverName) {
+        addTarget(screen.name());
+      }
+    }
+  }
+
+  for (const auto &client : m_connectedClients) {
+    addTarget(client);
+  }
+  for (const auto &target : mouseBroadcastTargets()) {
+    addTarget(target);
+  }
+
+  QStringList result = targets.values();
+  result.sort(Qt::CaseInsensitive);
+  return result;
+}
+
+bool MainWindow::hasConnectedMouseBroadcastTarget() const
+{
+  const auto selectedTargets = mouseBroadcastTargets();
+  if (selectedTargets.isEmpty()) {
+    return !m_connectedClients.isEmpty();
+  }
+
+  for (const auto &target : selectedTargets) {
+    if (m_connectedClients.contains(target)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void MainWindow::setMouseBroadcastTargets(const QStringList &targets)
+{
+  auto normalized = targets;
+  normalized.removeAll(QString());
+  normalized.removeDuplicates();
+  normalized.removeIf([this](const auto &target) { return !m_nameRegEx.match(target).hasMatch(); });
+  normalized.sort(Qt::CaseInsensitive);
+
+  const auto changed = normalized != mouseBroadcastTargets();
+  Settings::setValue(Settings::Gui::MouseBroadcastTargets, normalized);
+  QTimer::singleShot(0, this, &MainWindow::rebuildMouseBroadcastTargetMenu);
+  updateMouseBroadcastControls();
+
+  if (changed && m_mouseBroadcasting) {
+    requestMouseBroadcast(true);
+  }
+  if (changed && m_keyboardBroadcasting) {
+    requestKeyboardBroadcast(true);
+  }
+}
+
+void MainWindow::rebuildMouseBroadcastTargetMenu()
+{
+  if (m_mouseBroadcastTargetsMenu == nullptr || ui->btnMouseBroadcastTargets == nullptr) {
     return;
-  m_statusBar->setServerClients(clients);
+  }
+
+  m_mouseBroadcastTargetsMenu->clear();
+  const auto selectedTargets = mouseBroadcastTargets();
+  const auto availableTargets = availableMouseBroadcastTargets();
+
+  auto *allTargets = m_mouseBroadcastTargetsMenu->addAction(tr("All connected computers"));
+  allTargets->setCheckable(true);
+  allTargets->setChecked(selectedTargets.isEmpty());
+  connect(allTargets, &QAction::triggered, this, [this] { setMouseBroadcastTargets({}); });
+
+  if (!availableTargets.isEmpty()) {
+    m_mouseBroadcastTargetsMenu->addSeparator();
+  }
+
+  for (const auto &target : availableTargets) {
+    auto *action = m_mouseBroadcastTargetsMenu->addAction(target);
+    action->setCheckable(true);
+    action->setChecked(selectedTargets.contains(target));
+    connect(action, &QAction::toggled, this, [this, target](bool checked) {
+      auto targets = mouseBroadcastTargets();
+      if (targets.isEmpty()) {
+        if (checked) {
+          targets.append(target);
+        }
+      } else if (checked) {
+        targets.append(target);
+      } else {
+        targets.removeAll(target);
+      }
+      setMouseBroadcastTargets(targets);
+    });
+  }
+
+  if (selectedTargets.isEmpty()) {
+    ui->btnMouseBroadcastTargets->setText(tr("Targets: All"));
+    ui->btnMouseBroadcastTargets->setToolTip(tr("Broadcast to all connected computers."));
+  } else {
+    ui->btnMouseBroadcastTargets->setText(tr("Targets: %1").arg(selectedTargets.size()));
+    ui->btnMouseBroadcastTargets->setToolTip(tr("Broadcast to: %1").arg(selectedTargets.join(", ")));
+  }
+
+  updateMouseBroadcastControls();
+}
+
+void MainWindow::requestMouseBroadcast(bool enabled)
+{
+  if (!m_mouseBroadcastStateKnown || m_mouseBroadcastRequestPending) {
+    updateMouseBroadcastControls();
+    return;
+  }
+
+  m_mouseBroadcastRequestPending = true;
+  m_mouseBroadcastRequestedEnabled = enabled;
+  updateMouseBroadcastControls();
+
+  if (!m_coreProcess.setMouseBroadcast(enabled, mouseBroadcastTargets())) {
+    m_mouseBroadcastRequestPending = false;
+    m_mouseBroadcastRequestedEnabled = m_mouseBroadcasting;
+    updateMouseBroadcastControls();
+    m_trayIcon->showMessage(
+        kAppName, tr("Mouse broadcasting could not be changed because the server is not ready."),
+        QSystemTrayIcon::Information
+    );
+  }
+}
+
+void MainWindow::requestKeyboardBroadcast(bool enabled)
+{
+  if (!m_keyboardBroadcastStateKnown || m_keyboardBroadcastRequestPending) {
+    updateMouseBroadcastControls();
+    return;
+  }
+
+  m_keyboardBroadcastRequestPending = true;
+  m_keyboardBroadcastRequestedEnabled = enabled;
+  updateMouseBroadcastControls();
+
+  if (!m_coreProcess.setKeyboardBroadcast(enabled, mouseBroadcastTargets())) {
+    m_keyboardBroadcastRequestPending = false;
+    m_keyboardBroadcastRequestedEnabled = m_keyboardBroadcasting;
+    updateMouseBroadcastControls();
+    m_trayIcon->showMessage(
+        kAppName, tr("Keyboard broadcasting could not be changed because the server is not ready."),
+        QSystemTrayIcon::Information
+    );
+  }
+}
+
+QString MainWindow::mouseBroadcastReasonText(const QString &reason) const
+{
+  if (reason == QStringLiteral("multipleMonitors")) {
+    return tr("Mouse broadcasting requires a single monitor on the server computer.");
+  }
+  if (reason == QStringLiteral("cursorNotOnServer")) {
+    return tr("Move the cursor back to the server computer before starting mouse broadcasting.");
+  }
+  if (reason == QStringLiteral("noTargets")) {
+    return tr("Mouse broadcasting needs at least one selected computer to be connected.");
+  }
+  if (reason == QStringLiteral("targetDisconnected")) {
+    return tr("Mouse broadcasting stopped because the last selected computer disconnected.");
+  }
+  if (reason == QStringLiteral("serverUnavailable")) {
+    return tr("Mouse broadcasting could not be changed because the server is not ready.");
+  }
+  if (reason == QStringLiteral("screensaver")) {
+    return tr("Mouse broadcasting stopped because the server screen was locked or entered the screen saver.");
+  }
+  return QString();
+}
+
+QString MainWindow::keyboardBroadcastReasonText(const QString &reason) const
+{
+  if (reason == QStringLiteral("cursorNotOnServer")) {
+    return tr("Move the cursor back to the server computer before starting keyboard broadcasting.");
+  }
+  if (reason == QStringLiteral("cursorLeftServer")) {
+    return tr("Keyboard broadcasting stopped because the cursor left the server computer.");
+  }
+  if (reason == QStringLiteral("noTargets")) {
+    return tr("Keyboard broadcasting needs at least one selected computer to be connected.");
+  }
+  if (reason == QStringLiteral("targetDisconnected")) {
+    return tr("Keyboard broadcasting stopped because the last selected computer disconnected.");
+  }
+  if (reason == QStringLiteral("serverUnavailable")) {
+    return tr("Keyboard broadcasting could not be changed because the server is not ready.");
+  }
+  if (reason == QStringLiteral("screensaver")) {
+    return tr("Keyboard broadcasting stopped because the server screen was locked or entered the screen saver.");
+  }
+  return QString();
+}
+
+void MainWindow::mouseBroadcastStateChanged(bool enabled, const QStringList &targets, const QString &reason)
+{
+  const bool stateWasKnown = m_mouseBroadcastStateKnown;
+  const bool wasEnabled = m_mouseBroadcasting;
+  const bool requestWasPending = m_mouseBroadcastRequestPending;
+
+  if (enabled || wasEnabled || requestWasPending) {
+    Settings::setValue(Settings::Gui::MouseBroadcastTargets, targets);
+  }
+
+  m_mouseBroadcastStateKnown = true;
+  m_mouseBroadcasting = enabled;
+  m_mouseBroadcastRequestPending = false;
+  m_mouseBroadcastRequestedEnabled = enabled;
+  rebuildMouseBroadcastTargetMenu();
+
+  QString notification = mouseBroadcastReasonText(reason);
+  if (notification.isEmpty() && stateWasKnown && wasEnabled != enabled) {
+    notification = enabled ? tr("Mouse broadcasting started.") : tr("Mouse broadcasting stopped.");
+  }
+
+  if (!notification.isEmpty() && (stateWasKnown || requestWasPending)) {
+    m_trayIcon->showMessage(kAppName, notification, QSystemTrayIcon::Information);
+  }
+  updateMouseBroadcastControls();
+  updateInputBroadcastStatus();
+}
+
+void MainWindow::keyboardBroadcastStateChanged(bool enabled, const QStringList &targets, const QString &reason)
+{
+  const bool stateWasKnown = m_keyboardBroadcastStateKnown;
+  const bool wasEnabled = m_keyboardBroadcasting;
+  const bool requestWasPending = m_keyboardBroadcastRequestPending;
+
+  if (enabled || wasEnabled || requestWasPending) {
+    Settings::setValue(Settings::Gui::MouseBroadcastTargets, targets);
+  }
+
+  m_keyboardBroadcastStateKnown = true;
+  m_keyboardBroadcasting = enabled;
+  m_keyboardBroadcastRequestPending = false;
+  m_keyboardBroadcastRequestedEnabled = enabled;
+  rebuildMouseBroadcastTargetMenu();
+
+  QString notification = keyboardBroadcastReasonText(reason);
+  if (notification.isEmpty() && stateWasKnown && wasEnabled != enabled) {
+    notification = enabled ? tr("Keyboard broadcasting started.") : tr("Keyboard broadcasting stopped.");
+  }
+
+  if (!notification.isEmpty() && (stateWasKnown || requestWasPending)) {
+    m_trayIcon->showMessage(kAppName, notification, QSystemTrayIcon::Information);
+  }
+  updateMouseBroadcastControls();
+  updateInputBroadcastStatus();
+}
+
+void MainWindow::inputBroadcastStateChanged(int modes)
+{
+  if (m_coreProcess.mode() != CoreMode::Client) {
+    return;
+  }
+
+  const bool stateWasKnown = m_inputBroadcastStateKnown;
+  const int previousModes = m_inputBroadcastModes;
+  m_inputBroadcastStateKnown = true;
+  m_inputBroadcastModes = modes;
+  updateInputBroadcastStatus();
+
+  if (!stateWasKnown || previousModes == modes || !m_coreProcess.isStarted()) {
+    return;
+  }
+
+  using namespace deskflow::input_broadcast;
+  QString notification;
+  if (modes == None) {
+    notification = tr("Input broadcasting stopped.");
+  } else if ((modes & Mouse) != 0 && (modes & Keyboard) != 0) {
+    notification = tr("Receiving mouse and keyboard broadcasting from the server.");
+  } else if ((modes & Mouse) != 0) {
+    notification = tr("Receiving mouse broadcasting from the server.");
+  } else {
+    notification = tr("Receiving keyboard broadcasting from the server.");
+  }
+  m_trayIcon->showMessage(kAppName, notification, QSystemTrayIcon::Information);
+}
+
+void MainWindow::updateInputBroadcastStatus()
+{
+  using namespace deskflow::input_broadcast;
+
+  const bool isServer = m_coreProcess.mode() == CoreMode::Server;
+  int modes = None;
+  if (m_coreProcess.isStarted()) {
+    modes = isServer ? deskflow::input_broadcast::modes(m_mouseBroadcasting, m_keyboardBroadcasting)
+                     : m_inputBroadcastModes;
+  }
+  m_statusBar->setInputBroadcastState(modes, isServer);
+}
+
+void MainWindow::updateMouseBroadcastControls()
+{
+  const bool isServer = m_coreProcess.mode() == CoreMode::Server;
+  const bool isStarted = m_coreProcess.isStarted();
+  const bool hasConnectedTarget = hasConnectedMouseBroadcastTarget();
+  const bool canToggleMouse = isServer && isStarted && m_mouseBroadcastStateKnown && !m_mouseBroadcastRequestPending &&
+                              (hasConnectedTarget || m_mouseBroadcasting);
+  const bool canToggleKeyboard = isServer && isStarted && m_keyboardBroadcastStateKnown &&
+                                 !m_keyboardBroadcastRequestPending && (hasConnectedTarget || m_keyboardBroadcasting);
+
+  ui->checkMouseBroadcast->setChecked(
+      m_mouseBroadcastRequestPending ? m_mouseBroadcastRequestedEnabled : m_mouseBroadcasting
+  );
+  ui->checkMouseBroadcast->setEnabled(canToggleMouse);
+  ui->checkKeyboardBroadcast->setChecked(
+      m_keyboardBroadcastRequestPending ? m_keyboardBroadcastRequestedEnabled : m_keyboardBroadcasting
+  );
+  ui->checkKeyboardBroadcast->setEnabled(canToggleKeyboard);
+  ui->btnMouseBroadcastTargets->setEnabled(
+      isServer && m_mouseBroadcastStateKnown && m_keyboardBroadcastStateKnown && !m_mouseBroadcastRequestPending &&
+      !m_keyboardBroadcastRequestPending && !availableMouseBroadcastTargets().isEmpty()
+  );
+
+  if (!isStarted) {
+    ui->checkMouseBroadcast->setToolTip(tr("Start the server to use mouse broadcasting."));
+  } else if (!m_mouseBroadcastStateKnown || m_mouseBroadcastRequestPending) {
+    ui->checkMouseBroadcast->setToolTip(tr("Waiting for the server to confirm mouse broadcasting state."));
+  } else if (!hasConnectedTarget && !m_mouseBroadcasting) {
+    ui->checkMouseBroadcast->setToolTip(tr("Connect at least one selected computer to start mouse broadcasting."));
+  } else if (m_mouseBroadcasting) {
+    ui->checkMouseBroadcast->setToolTip(
+        tr("Mouse broadcasting keeps the cursor on the server computer until broadcasting is stopped.")
+    );
+  } else {
+    ui->checkMouseBroadcast->setToolTip(tr("Send mouse movement, clicks, and scrolling to the selected computers."));
+  }
+
+  if (!isStarted) {
+    ui->checkKeyboardBroadcast->setToolTip(tr("Start the server to use keyboard broadcasting."));
+  } else if (!m_keyboardBroadcastStateKnown || m_keyboardBroadcastRequestPending) {
+    ui->checkKeyboardBroadcast->setToolTip(tr("Waiting for the server to confirm keyboard broadcasting state."));
+  } else if (!hasConnectedTarget && !m_keyboardBroadcasting) {
+    ui->checkKeyboardBroadcast->setToolTip(tr("Connect at least one selected computer to start keyboard broadcasting.")
+    );
+  } else if (m_keyboardBroadcasting) {
+    ui->checkKeyboardBroadcast->setToolTip(
+        tr("Raw key presses are being sent to the selected computers. Leaving the server stops broadcasting.")
+    );
+  } else {
+    ui->checkKeyboardBroadcast->setToolTip(
+        tr("Send raw key presses to computers using the same keyboard layout. Input method text may differ.")
+    );
+  }
+
+  m_actionStopInputBroadcast->setVisible(isServer && (m_mouseBroadcasting || m_keyboardBroadcasting));
+  m_actionStopInputBroadcast->setEnabled(!m_mouseBroadcastRequestPending && !m_keyboardBroadcastRequestPending);
 }
 
 void MainWindow::daemonIpcClientConnectionFailed()

@@ -125,6 +125,24 @@ int main(int argc, char **argv)
   QObject::connect(
       ipcServer, &deskflow::core::ipc::IpcServer::stopProcessRequested, coreApp, &App::quit, Qt::DirectConnection
   );
+  if (auto *serverApp = dynamic_cast<ServerApp *>(coreApp); serverApp != nullptr) {
+    QObject::connect(
+        ipcServer, &deskflow::core::ipc::CoreIpcServer::mouseBroadcastRequested, serverApp,
+        &ServerApp::requestMouseBroadcast, Qt::DirectConnection
+    );
+    QObject::connect(
+        ipcServer, &deskflow::core::ipc::CoreIpcServer::mouseBroadcastStateRequested, serverApp,
+        &ServerApp::requestMouseBroadcastState, Qt::DirectConnection
+    );
+    QObject::connect(
+        ipcServer, &deskflow::core::ipc::CoreIpcServer::keyboardBroadcastRequested, serverApp,
+        &ServerApp::requestKeyboardBroadcast, Qt::DirectConnection
+    );
+    QObject::connect(
+        ipcServer, &deskflow::core::ipc::CoreIpcServer::keyboardBroadcastStateRequested, serverApp,
+        &ServerApp::requestKeyboardBroadcastState, Qt::DirectConnection
+    );
+  }
   ipcServer->listen();
 
   QThread coreThread;

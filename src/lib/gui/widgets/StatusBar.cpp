@@ -6,6 +6,7 @@
 
 #include "StatusBar.h"
 #include "common/Constants.h"
+#include "common/InputBroadcast.h"
 #include "common/Settings.h"
 
 #include <QEvent>
@@ -17,6 +18,7 @@ StatusBar::StatusBar(QWidget *parent)
     : QStatusBar{parent},
       m_btnFingerprint{new QPushButton(this)},
       m_lblSecurityIcon{new QLabel(this)},
+      m_lblInputBroadcast{new QLabel(this)},
       m_lblStatus{new QLabel(this)},
       m_btnUpdate{new QPushButton(this)},
       m_retryTimer{new QTimer(this)}
@@ -37,8 +39,12 @@ StatusBar::StatusBar(QWidget *parent)
   m_lblSecurityIcon->setScaledContents(true);
   insertPermanentWidget(1, m_lblSecurityIcon);
 
+  m_lblInputBroadcast->setVisible(false);
+  m_lblInputBroadcast->setMargin(4);
+  insertPermanentWidget(2, m_lblInputBroadcast);
+
   m_lblStatus->setText(tr("%1 is not running").arg(kAppName));
-  insertPermanentWidget(2, m_lblStatus, 1);
+  insertPermanentWidget(3, m_lblStatus, 1);
 
   m_btnUpdate->setVisible(false);
   m_btnUpdate->setFlat(true);
@@ -46,7 +52,7 @@ StatusBar::StatusBar(QWidget *parent)
   m_btnUpdate->setIcon(QIcon::fromTheme(QStringLiteral("software-updates-release")));
   m_btnUpdate->setFixedHeight(btnHeight);
   m_btnUpdate->setIconSize(iconSize);
-  insertPermanentWidget(3, m_btnUpdate);
+  insertPermanentWidget(4, m_btnUpdate);
   connect(m_btnUpdate, &QPushButton::clicked, this, &StatusBar::requestUpdateVersion);
 
   m_retryTimer->setInterval(1000);
@@ -181,6 +187,7 @@ void StatusBar::updateText()
   m_btnFingerprint->setToolTip(tr("View local fingerprint"));
   m_btnUpdate->setText(tr("Update available"));
   setSecurityLevel(m_securityLevel);
+  setInputBroadcastState(m_inputBroadcastModes, m_inputBroadcastIsServer);
 }
 
 void StatusBar::updateTimerLabel()
@@ -208,4 +215,33 @@ void StatusBar::setSecurityLevel(const QString &securityLevel)
   m_securityLevel = securityLevel;
   const auto txt = m_encrypted ? tr("%1 Encryption Enabled").arg(m_securityLevel) : tr("Encryption Disabled");
   m_lblSecurityIcon->setToolTip(txt);
+}
+
+void StatusBar::setInputBroadcastState(int modes, bool isServer)
+{
+  using namespace deskflow::input_broadcast;
+
+  m_inputBroadcastModes = modes;
+  m_inputBroadcastIsServer = isServer;
+  m_lblInputBroadcast->setVisible(modes != None);
+  if (modes == None) {
+    m_lblInputBroadcast->clear();
+    m_lblInputBroadcast->setToolTip(QString());
+    return;
+  }
+
+  QString modeText;
+  if ((modes & Mouse) != 0 && (modes & Keyboard) != 0) {
+    modeText = tr("Mouse + Keyboard");
+  } else if ((modes & Mouse) != 0) {
+    modeText = tr("Mouse");
+  } else {
+    modeText = tr("Keyboard");
+  }
+
+  m_lblInputBroadcast->setText(isServer ? tr("Broadcasting: %1").arg(modeText) : tr("Receiving: %1").arg(modeText));
+  m_lblInputBroadcast->setToolTip(
+      isServer ? tr("Input events are being sent to the selected computers.")
+               : tr("Input events from the server are being applied on this computer.")
+  );
 }

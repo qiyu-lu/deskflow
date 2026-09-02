@@ -420,6 +420,65 @@ void InputFilter::KeyboardBroadcastAction::perform(const Event &event)
   );
 }
 
+InputFilter::MouseBroadcastAction::MouseBroadcastAction(IEventQueue *events, Mode mode) : m_mode(mode), m_events(events)
+{
+  // do nothing
+}
+
+InputFilter::MouseBroadcastAction::MouseBroadcastAction(
+    IEventQueue *events, Mode mode, const std::set<std::string> &screens
+)
+    : m_mode(mode),
+      m_screens(IKeyState::KeyInfo::join(screens)),
+      m_events(events)
+{
+  // do nothing
+}
+
+InputFilter::MouseBroadcastAction::Mode InputFilter::MouseBroadcastAction::getMode() const
+{
+  return m_mode;
+}
+
+std::set<std::string> InputFilter::MouseBroadcastAction::getScreens() const
+{
+  std::set<std::string> screens;
+  IKeyState::KeyInfo::split(m_screens.c_str(), screens);
+  return screens;
+}
+
+InputFilter::Action *InputFilter::MouseBroadcastAction::clone() const
+{
+  return new MouseBroadcastAction(*this);
+}
+
+std::string InputFilter::MouseBroadcastAction::format() const
+{
+  static const char *s_mode[] = {"off", "on", "toggle"};
+  static const char *s_name = "mouseBroadcast";
+
+  if (m_screens.empty() || m_screens[0] == '*') {
+    return deskflow::string::sprintf("%s(%s)", s_name, s_mode[m_mode]);
+  } else {
+    return deskflow::string::sprintf(
+        "%s(%s,%.*s)", s_name, s_mode[m_mode], static_cast<int>(m_screens.size() >= 2 ? m_screens.size() - 2 : 0),
+        m_screens.c_str() + 1
+    );
+  }
+}
+
+void InputFilter::MouseBroadcastAction::perform(const Event &event)
+{
+  static const Server::MouseBroadcastInfo::State s_state[] = {
+      Server::MouseBroadcastInfo::kOff, Server::MouseBroadcastInfo::kOn, Server::MouseBroadcastInfo::kToggle
+  };
+
+  auto *info = new Server::MouseBroadcastInfo(s_state[m_mode], m_screens);
+  m_events->addEvent(
+      Event(EventTypes::ServerMouseBroadcast, event.getTarget(), info, Event::EventFlags::DeliverImmediately)
+  );
+}
+
 InputFilter::KeystrokeAction::KeystrokeAction(IEventQueue *events, IPlatformScreen::KeyInfo *info, bool press)
     : m_keyInfo(info),
       m_press(press),

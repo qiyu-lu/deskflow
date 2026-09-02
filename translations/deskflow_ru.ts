@@ -134,6 +134,38 @@ p, li { white-space: pre-wrap; }
         <source>Switch to %1</source>
         <translation>Переключиться на %1</translation>
     </message>
+    <message>
+        <source>Control mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle mouse broadcasting (recommended)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable mouse broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Control keyboard broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle keyboard broadcasting (recommended)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable keyboard broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable keyboard broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ClientConfigDialog</name>
@@ -583,6 +615,162 @@ Additionally, check you are able to %1 the server config file: %2</source>
     </message>
     <message>
         <source>&lt;p&gt;Keyboard layout support requires matching layouts on all computers. The following layouts from the other computer are not installed on this computer:&lt;/p&gt;&lt;p&gt;&lt;b&gt;%1&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Please install them to enable support for these layouts.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Targets: All</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All connected computers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcast to all connected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Targets: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcast to: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting could not be changed because the server is not ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting requires a single monitor on the server computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the cursor back to the server computer before starting mouse broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting needs at least one selected computer to be connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped because the last selected computer disconnected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting started.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Start the server to use mouse broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for the server to confirm mouse broadcasting state.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connect at least one selected computer to start mouse broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting keeps the cursor on the server computer until broadcasting is stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send mouse movement, clicks, and scrolling to the selected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcast:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stop all input broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting could not be changed because the server is not ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped because the server screen was locked or entered the screen saver.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the cursor back to the server computer before starting keyboard broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the cursor left the server computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting needs at least one selected computer to be connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the last selected computer disconnected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the server screen was locked or entered the screen saver.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting started.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Input broadcasting stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving mouse and keyboard broadcasting from the server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving mouse broadcasting from the server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving keyboard broadcasting from the server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Start the server to use keyboard broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for the server to confirm keyboard broadcasting state.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connect at least one selected computer to start keyboard broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Raw key presses are being sent to the selected computers. Leaving the server stops broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send raw key presses to computers using the same keyboard layout. Input method text may differ.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1353,6 +1541,34 @@ Enabling this setting will disable the server config GUI.</source>
     <message>
         <source>Encryption Disabled</source>
         <translation>Шифрование отключено</translation>
+    </message>
+    <message>
+        <source>Mouse + Keyboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcasting: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Input events are being sent to the selected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Input events from the server are being applied on this computer.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

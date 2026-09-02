@@ -120,6 +120,7 @@ public:
   void setOptions(const OptionsList &options) override;
   void setSequenceNumber(uint32_t) override;
   bool isPrimary() const override;
+  bool hasMultipleMonitors() const override;
   std::string getSecureInputApp() const override;
 
 protected:

@@ -146,6 +146,11 @@ enum class EventTypes : uint32_t
   */
   ServerKeyboardBroadcast,
 
+  /** This event is sent to inform the server to turn mouse broadcasting on or off.
+      The event data is a pointer to MouseBroadcastInfo.
+  */
+  ServerMouseBroadcast,
+
   /** This event is sent to inform the server to lock the cursor to the active computer or to
       unlock it. The event data is a pointer to LockCursorToScreenInfo.
   */
@@ -157,6 +162,10 @@ enum class EventTypes : uint32_t
   ServerAppReloadConfig,
   ServerAppForceReconnect,
   ServerAppResetServer,
+  ServerAppMouseBroadcast,
+  ServerAppMouseBroadcastState,
+  ServerAppKeyboardBroadcast,
+  ServerAppKeyboardBroadcastState,
 
   /// This event is sent when key is down. Event data is a pointer to KeyInfo (count == 1)
   KeyStateKeyDown,

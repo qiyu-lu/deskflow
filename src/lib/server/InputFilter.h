@@ -252,6 +252,34 @@ public:
     IEventQueue *m_events;
   };
 
+  // MouseBroadcastAction
+  class MouseBroadcastAction : public Action
+  {
+  public:
+    enum Mode
+    {
+      kOff,
+      kOn,
+      kToggle
+    };
+
+    explicit MouseBroadcastAction(IEventQueue *events, Mode = kToggle);
+    explicit MouseBroadcastAction(IEventQueue *events, Mode, const std::set<std::string> &screens);
+
+    Mode getMode() const;
+    std::set<std::string> getScreens() const;
+
+    // Action overrides
+    Action *clone() const override;
+    std::string format() const override;
+    void perform(const Event &) override;
+
+  private:
+    Mode m_mode;
+    std::string m_screens;
+    IEventQueue *m_events;
+  };
+
   // KeystrokeAction
   class KeystrokeAction : public Action
   {

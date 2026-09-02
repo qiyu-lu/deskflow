@@ -119,7 +119,7 @@ XWindowsScreen::XWindowsScreen(const char *displayName, bool isPrimary, IEventQu
 #ifdef HAVE_XI2
     m_xi2detected = detectXI2();
     if (m_xi2detected) {
-      selectXIRawMotion();
+      selectXIRawInputEvents();
     } else
 #endif
     {
@@ -423,6 +423,11 @@ void XWindowsScreen::setSequenceNumber(uint32_t seqNum)
 bool XWindowsScreen::isPrimary() const
 {
   return m_isPrimary;
+}
+
+bool XWindowsScreen::hasMultipleMonitors() const
+{
+  return m_xinerama;
 }
 
 std::string XWindowsScreen::getSecureInputApp() const
@@ -1164,7 +1169,9 @@ void XWindowsScreen::handleSystemEvent(const Event &event)
 
 #ifdef HAVE_XI2
   if (m_xi2detected) {
-    // Process RawMotion
+    // Process raw input while the pointer is on the primary screen. Once the
+    // pointer leaves, the grab window receives the corresponding core events
+    // instead.
     auto *cookie = &xevent->xcookie;
     if (XGetEventData(m_display, cookie) && cookie->type == GenericEvent && cookie->extension == xi_opcode) {
       if (cookie->evtype == XI_RawMotion) {
@@ -1181,6 +1188,18 @@ void XWindowsScreen::handleSystemEvent(const Event &event)
             &xmotion.y, &msk
         );
         onMouseMove(xmotion);
+        XFreeEventData(m_display, cookie);
+        return;
+      }
+      if (m_isOnScreen && (cookie->evtype == XI_RawKeyPress || cookie->evtype == XI_RawKeyRelease)) {
+        const auto *rawEvent = static_cast<const XIRawEvent *>(cookie->data);
+        onKeyRaw(rawEvent->detail, cookie->evtype == XI_RawKeyPress);
+        XFreeEventData(m_display, cookie);
+        return;
+      }
+      if (m_isOnScreen && (cookie->evtype == XI_RawButtonPress || cookie->evtype == XI_RawButtonRelease)) {
+        const auto *rawEvent = static_cast<const XIRawEvent *>(cookie->data);
+        onMouseRawButton(rawEvent->detail, cookie->evtype == XI_RawButtonPress);
         XFreeEventData(m_display, cookie);
         return;
       }
@@ -1473,6 +1492,96 @@ void XWindowsScreen::onMouseRelease(const XButtonEvent &xbutton)
   }
 }
 
+#ifdef HAVE_XI2
+void XWindowsScreen::onKeyRaw(unsigned int keycode, bool press)
+{
+  if (keycode == 0) {
+    LOG_VERBOSE("event: raw key has no keycode");
+    return;
+  }
+
+  // XI raw key events do not include modifier state. Reconstruct the state
+  // from the last event before polling the new state below. This preserves
+  // the same pre-event modifier semantics as a core XKeyEvent.
+  const auto mask = m_keyState->getActiveModifiers();
+  unsigned int xState = 0;
+  if (!m_keyState->mapModifiersToX(mask, xState)) {
+    LOG_VERBOSE("event: failed to map raw key modifiers, using no modifiers");
+    xState = 0;
+  }
+#if HAVE_XKB_EXTENSION
+  if (m_xkb) {
+    xState = XkbBuildCoreState(xState, m_keyState->pollActiveGroup());
+  }
+#endif
+
+  XKeyEvent xkey{};
+  // Bypass XIM text composition: keyboard broadcast intentionally carries
+  // physical key events and does not promise cross-IME text equivalence.
+  xkey.type = KeyRelease;
+  xkey.display = m_display;
+  xkey.window = m_root;
+  xkey.root = m_root;
+  xkey.time = CurrentTime;
+  xkey.state = xState;
+  xkey.keycode = static_cast<KeyCode>(keycode);
+  xkey.same_screen = True;
+
+  const auto button = static_cast<KeyButton>(keycode);
+  const bool isRepeat = press && m_keyState->isKeyDown(button);
+  const auto currentMask = m_keyState->pollActiveModifiers();
+  m_keyState->onKey(button, press, currentMask);
+
+  // Registered hotkeys are delivered separately as core events. Do not also
+  // relay their trigger key through the raw-input path.
+  if (press && m_hotKeyToIDMap.contains(HotKeyItem(keycode, xState & 0xffu))) {
+    LOG_VERBOSE("event: raw key is a registered hotkey, awaiting core event");
+    return;
+  }
+
+  KeyID key = mapKeyFromX(&xkey);
+  if (key == kKeyNone) {
+    LOG_VERBOSE("can't map raw keycode to key id");
+    return;
+  }
+
+  if ((key == kKeyPause || key == kKeyBreak) &&
+      (mask & (KeyModifierControl | KeyModifierAlt)) == (KeyModifierControl | KeyModifierAlt)) {
+    LOG_DEBUG("emulate ctrl+alt+del");
+    key = kKeyDelete;
+  }
+
+  LOG_VERBOSE(
+      "event: raw key %s%s code=%u state=0x%04x", press ? "press" : "release", isRepeat ? " (repeat)" : "", keycode,
+      xState
+  );
+  m_keyState->sendKeyEvent(getEventTarget(), press, isRepeat, key, mask, 1, button);
+}
+
+void XWindowsScreen::onMouseRawButton(unsigned int button, bool press)
+{
+  XButtonEvent xbutton{};
+  xbutton.type = press ? ButtonPress : ButtonRelease;
+  xbutton.display = m_display;
+  xbutton.window = m_window;
+  xbutton.button = button;
+
+  Window root;
+  Window child;
+  int rootX;
+  int rootY;
+  int windowX;
+  int windowY;
+  XQueryPointer(m_display, m_root, &root, &child, &rootX, &rootY, &windowX, &windowY, &xbutton.state);
+
+  if (press) {
+    onMousePress(xbutton);
+  } else {
+    onMouseRelease(xbutton);
+  }
+}
+#endif
+
 void XWindowsScreen::onMouseMove(const XMotionEvent &xmotion)
 {
   LOG_VERBOSE("event: MotionNotify %d,%d", xmotion.x_root, xmotion.y_root);
@@ -1744,9 +1853,7 @@ ButtonID XWindowsScreen::mapButtonFromX(const XButtonEvent *event) const
   case 1:
   case 2:
   case 3:
-  case 6:
-  case 7:
-    return static_cast<ButtonID>(button); // Handle Left, Middle and Right buttons
+    return static_cast<ButtonID>(button);
   case 8:
     return kButtonExtra0; // Mouse 4
   case 9:
@@ -1944,16 +2051,18 @@ bool XWindowsScreen::detectXI2()
 }
 
 #ifdef HAVE_XI2
-void XWindowsScreen::selectXIRawMotion()
+void XWindowsScreen::selectXIRawInputEvents()
 {
   XIEventMask mask;
 
-  mask.deviceid = XIAllDevices;
   mask.mask_len = XIMaskLen(XI_RawMotion);
   mask.mask = (unsigned char *)calloc(mask.mask_len, sizeof(char));
   mask.deviceid = XIAllMasterDevices;
-  memset(mask.mask, 0, 2);
+  memset(mask.mask, 0, mask.mask_len);
+  XISetMask(mask.mask, XI_RawKeyPress);
   XISetMask(mask.mask, XI_RawKeyRelease);
+  XISetMask(mask.mask, XI_RawButtonPress);
+  XISetMask(mask.mask, XI_RawButtonRelease);
   XISetMask(mask.mask, XI_RawMotion);
   XISelectEvents(m_display, DefaultRootWindow(m_display), &mask, 1);
   free(mask.mask);

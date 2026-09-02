@@ -935,6 +935,35 @@ void Config::parseAction(
     action = new InputFilter::KeyboardBroadcastAction(m_events, mode, screens);
   }
 
+  else if (name == "mouseBroadcast") {
+    if (args.size() > 2) {
+      throw ServerConfigReadException(s, "syntax for action: mouseBroadcast([{off|on|toggle}[,screens]])");
+    }
+
+    InputFilter::MouseBroadcastAction::Mode mode = InputFilter::MouseBroadcastAction::kToggle;
+    if (args.size() >= 1) {
+      if (args[0] == "off") {
+        mode = InputFilter::MouseBroadcastAction::kOff;
+      } else if (args[0] == "on") {
+        mode = InputFilter::MouseBroadcastAction::kOn;
+      } else if (args[0] == "toggle") {
+        mode = InputFilter::MouseBroadcastAction::kToggle;
+      } else {
+        throw ServerConfigReadException(
+            s, "syntax for action: "
+               "mouseBroadcast([{off|on|toggle}[,screens]])"
+        );
+      }
+    }
+
+    std::set<std::string> screens;
+    if (args.size() >= 2) {
+      parseScreens(s, args[1], screens);
+    }
+
+    action = new InputFilter::MouseBroadcastAction(m_events, mode, screens);
+  }
+
   else {
     throw ServerConfigReadException(s, "unknown action argument \"%{1}\"", name);
   }

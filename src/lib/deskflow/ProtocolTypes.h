@@ -45,7 +45,7 @@ static const int16_t kProtocolMajorVersion = 1;
  * @note When incrementing the minor version, the Deskflow application version should also increment
  * @since Protocol version 1.0
  */
-static const int16_t kProtocolMinorVersion = 8;
+static const int16_t kProtocolMinorVersion = 9;
 
 /**
  * @brief Default TCP port for Deskflow connections
@@ -1125,6 +1125,22 @@ extern const char *const kMsgDSecureInputNotification;
  * @since Protocol version 1.8
  */
 extern const char *const kMsgDLanguageSynchronisation;
+
+/**
+ * @brief Input broadcasting state (v1.9+)
+ *
+ * **Message Code**: `"DIBS"`
+ * **Direction**: Primary -> Secondary
+ * **Format**: `"DIBS%1i"`
+ * **Parameters**:
+ * - `$1`: Bit mask of input broadcast modes (mouse = 1, keyboard = 2)
+ *
+ * This is a status-only message. Input events continue to use their existing
+ * protocol messages.
+ *
+ * @since Protocol version 1.9
+ */
+extern const char *const kMsgDInputBroadcastState;
 
 /** @} */ // end of protocol_system group
 

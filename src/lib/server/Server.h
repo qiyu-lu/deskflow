@@ -29,6 +29,15 @@ class InputFilter;
 namespace deskflow {
 class Screen;
 }
+namespace deskflow::server {
+int32_t mapMouseBroadcastCoordinate(
+    int32_t value, int32_t sourceOrigin, int32_t sourceSize, int32_t targetOrigin, int32_t targetSize
+);
+bool isMouseBroadcastStartAllowed(bool activeOnPrimary, bool screensaverActive);
+bool shouldBlockMouseBroadcastScreenSwitch(
+    bool broadcasting, bool forScreensaver, bool activeOnPrimary, bool destinationIsPrimary
+);
+} // namespace deskflow::server
 class IEventQueue;
 class Thread;
 class ClientListener;
@@ -130,6 +139,32 @@ public:
     std::string m_screens;
   };
 
+  //! Mouse broadcast data
+  class MouseBroadcastInfo : public EventData
+  {
+  public:
+    enum State
+    {
+      kOff,
+      kOn,
+      kToggle
+    };
+
+    explicit MouseBroadcastInfo(State state = kToggle) : m_state(state)
+    {
+      // do nothing
+    }
+    MouseBroadcastInfo(State state, const std::string &screens) : m_state(state), m_screens(screens)
+    {
+      // do nothing
+    }
+    ~MouseBroadcastInfo() override = default;
+
+  public:
+    State m_state;
+    std::string m_screens;
+  };
+
   /*!
   Start the server with the configuration \p config and the primary
   client (local screen) \p primaryClient.  The client retains
@@ -169,6 +204,18 @@ public:
   The caller can also just destroy this object to force the disconnection.
   */
   void disconnect();
+
+  //! Change mouse broadcasting state
+  void setMouseBroadcast(MouseBroadcastInfo::State state, const std::string &screens);
+
+  //! Send the authoritative mouse broadcasting state to the GUI
+  void sendMouseBroadcastStateIpc(const char *reason = "") const;
+
+  //! Change keyboard broadcasting state
+  void setKeyboardBroadcast(KeyboardBroadcastInfo::State state, const std::string &screens);
+
+  //! Send the authoritative keyboard broadcasting state to the GUI
+  void sendKeyboardBroadcastStateIpc(const char *reason = "") const;
 
   //! Store ClientListener pointer
   void setListener(ClientListener *p)
@@ -322,14 +369,41 @@ private:
   void handleSwitchInDirectionEvent(const Event &event);
   void handleToggleScreenEvent(const Event &);
   void handleKeyboardBroadcastEvent(const Event &event);
+  void handleMouseBroadcastEvent(const Event &event);
   void handleLockCursorToScreenEvent(const Event &event);
+
+  bool isMouseBroadcastTarget(const std::string &name) const;
+  bool isMouseBroadcastTarget(const std::string &name, const std::string &screens) const;
+  bool hasConnectedMouseBroadcastTarget(const std::string &screens) const;
+  void updateMouseBroadcast(MouseBroadcastInfo::State state, const std::string &screens, const char *reason);
+  void mapMouseBroadcastPosition(
+      const BaseClientProxy *target, int32_t sourceX, int32_t sourceY, int32_t &targetX, int32_t &targetY
+  ) const;
+  void reconcileMouseBroadcastTargets();
+  void leaveMouseBroadcastTarget(BaseClientProxy *client);
+  void leaveMouseBroadcastTargets();
+  void broadcastMousePosition(int32_t x, int32_t y);
+  void broadcastMouseButton(ButtonID button, bool down);
+  void broadcastMouseWheel(int32_t xDelta, int32_t yDelta);
+
+  bool isKeyboardBroadcastTarget(const std::string &name) const;
+  bool isKeyboardBroadcastTarget(const std::string &name, const std::string &screens) const;
+  bool hasConnectedKeyboardBroadcastTarget(const std::string &screens) const;
+  void updateKeyboardBroadcast(KeyboardBroadcastInfo::State state, const std::string &screens, const char *reason);
+  void reconcileKeyboardBroadcastTargets();
+  void leaveKeyboardBroadcastTarget(BaseClientProxy *client);
+  void leaveKeyboardBroadcastTargets();
+  void broadcastKeyDown(KeyID, KeyModifierMask, KeyButton, const std::string &);
+  void broadcastKeyRepeat(KeyID, KeyModifierMask, int32_t, KeyButton, const std::string &);
+  void broadcastKeyUp(KeyID, KeyModifierMask, KeyButton);
+  void sendInputBroadcastStates();
 
   // event processing
   void onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, uint32_t seqNum);
   void onScreensaver(bool activated);
   void onKeyDown(KeyID, KeyModifierMask, KeyButton, const std::string &, const char *screens);
   void onKeyUp(KeyID, KeyModifierMask, KeyButton, const char *screens);
-  void onKeyRepeat(KeyID, KeyModifierMask, int32_t, KeyButton, const std::string &);
+  void onKeyRepeat(KeyID, KeyModifierMask, int32_t, KeyButton, const std::string &, const char *screens);
   void onMouseDown(ButtonID);
   void onMouseUp(ButtonID);
   bool onMouseMovePrimary(int32_t x, int32_t y);
@@ -403,8 +477,23 @@ private:
   ClientListener *m_clientListener = nullptr;
   Stopwatch m_switchTwoTapTimer;
 
-  // Name of screen broadcasting the keyboard events
+  struct BroadcastKey
+  {
+    KeyID m_id;
+    KeyModifierMask m_mask;
+    KeyButton m_button;
+  };
+
+  // Screens selected for keyboard broadcasting, active targets and keys held on each target.
   std::string m_keyboardBroadcastingScreens;
+  std::set<std::string> m_keyboardBroadcastTargetScreens;
+  std::map<std::string, std::map<KeyButton, BroadcastKey>> m_keyboardBroadcastKeysDown;
+
+  // Screens selected for mouse broadcasting and screens currently entered as mirror targets.
+  std::string m_mouseBroadcastingScreens;
+  std::set<std::string> m_mouseBroadcastEnteredScreens;
+  std::set<ButtonID> m_mouseButtonsDown;
+  std::map<std::string, uint8_t> m_inputBroadcastModesSent;
 
   // all clients (including the primary client) indexed by name
   using ClientList = std::map<std::string, BaseClientProxy *>;
@@ -461,6 +550,7 @@ private:
   // flag whether or not we have broadcasting enabled and the screens to
   // which we should send broadcasted keys.
   bool m_keyboardBroadcasting = false;
+  bool m_mouseBroadcasting = false;
 
   // screen locking (former scroll lock)
   bool m_lockedToScreen = false;

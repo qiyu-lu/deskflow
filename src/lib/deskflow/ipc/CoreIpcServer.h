@@ -10,6 +10,9 @@
 
 #include <QObject>
 #include <QSet>
+#include <QStringList>
+
+#include <cstdint>
 
 class QLocalSocket;
 
@@ -23,9 +26,18 @@ public:
   explicit CoreIpcServer(QObject *parent);
 
   static CoreIpcServer &instance();
+  void setInputBroadcastState(uint8_t modes);
+
+Q_SIGNALS:
+  void mouseBroadcastRequested(bool enabled, const QStringList &targets);
+  void mouseBroadcastStateRequested();
+  void keyboardBroadcastRequested(bool enabled, const QStringList &targets);
+  void keyboardBroadcastStateRequested();
 
 private:
   void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) override;
+
+  uint8_t m_inputBroadcastModes = 0;
 };
 
 } // namespace deskflow::core::ipc

@@ -50,6 +50,22 @@ QString Action::text() const
     text.append(m_commandTemplate.arg(m_lockCursorModeNames.at(m_lockCursorMode)));
     break;
 
+  case Type::mouseBroadcast: {
+    QString commandArgs = m_mouseBroadcastModeNames.at(m_mouseBroadcastMode);
+    if (haveScreens() && !m_typeScreenNames.isEmpty()) {
+      commandArgs.append(QStringLiteral(",%1").arg(m_typeScreenNames.join(QStringLiteral(":"))));
+    }
+    text.append(m_commandTemplate.arg(commandArgs));
+  } break;
+
+  case Type::keyboardBroadcast: {
+    QString commandArgs = m_mouseBroadcastModeNames.at(m_keyboardBroadcastMode);
+    if (haveScreens() && !m_typeScreenNames.isEmpty()) {
+      commandArgs.append(QStringLiteral(",%1").arg(m_typeScreenNames.join(QStringLiteral(":"))));
+    }
+    text.append(m_commandTemplate.arg(commandArgs));
+  } break;
+
   default:
     break;
   }
@@ -78,6 +94,12 @@ void Action::loadSettings(QSettings &settings)
   setSwitchScreenName(settings.value(SettingsKeys::SwitchToScreen).toString());
   setSwitchDirection(settings.value(SettingsKeys::SwitchDirection, static_cast<int>(SwitchDirection::left)).toInt());
   setLockCursorMode(settings.value(SettingsKeys::LockToScreen, static_cast<int>(LockCursorMode::toggle)).toInt());
+  setMouseBroadcastMode(
+      settings.value(SettingsKeys::MouseBroadcast, static_cast<int>(MouseBroadcastMode::toggle)).toInt()
+  );
+  setKeyboardBroadcastMode(
+      settings.value(SettingsKeys::KeyboardBroadcast, static_cast<int>(MouseBroadcastMode::toggle)).toInt()
+  );
   setActiveOnRelease(settings.value(SettingsKeys::ActiveOnRelease, false).toBool());
   setHaveScreens(settings.value(SettingsKeys::HasScreens, false).toBool());
   setRestartServer(settings.value(SettingsKeys::RestartServer, false).toBool());
@@ -98,6 +120,8 @@ void Action::saveSettings(QSettings &settings) const
   settings.setValue(SettingsKeys::SwitchToScreen, m_switchScreenName);
   settings.setValue(SettingsKeys::SwitchDirection, m_switchDirection);
   settings.setValue(SettingsKeys::LockToScreen, m_lockCursorMode);
+  settings.setValue(SettingsKeys::MouseBroadcast, m_mouseBroadcastMode);
+  settings.setValue(SettingsKeys::KeyboardBroadcast, m_keyboardBroadcastMode);
   settings.setValue(SettingsKeys::ActiveOnRelease, m_activeOnRelease);
   settings.setValue(SettingsKeys::HasScreens, m_hasScreens);
   settings.setValue(SettingsKeys::RestartServer, m_restartServer);
@@ -147,6 +171,16 @@ int Action::lockCursorMode() const
   return m_lockCursorMode;
 }
 
+int Action::mouseBroadcastMode() const
+{
+  return m_mouseBroadcastMode;
+}
+
+int Action::keyboardBroadcastMode() const
+{
+  return m_keyboardBroadcastMode;
+}
+
 bool Action::activeOnRelease() const
 {
   return m_activeOnRelease;
@@ -185,6 +219,16 @@ void Action::setSwitchDirection(int d)
 void Action::setLockCursorMode(int m)
 {
   m_lockCursorMode = m;
+}
+
+void Action::setMouseBroadcastMode(int m)
+{
+  m_mouseBroadcastMode = m;
+}
+
+void Action::setKeyboardBroadcastMode(int m)
+{
+  m_keyboardBroadcastMode = m;
 }
 
 void Action::setActiveOnRelease(bool b)

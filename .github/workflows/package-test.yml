@@ -1,0 +1,151 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
+# SPDX-License-Identifier: MIT
+
+name: Package test builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/mouse-broadcast]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CMAKE_CONFIGURE: >-
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=ON
+    -DSKIP_BUILD_TESTS=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+  PACKAGE_LABEL: input-broadcast-v0.2.0
+
+jobs:
+  windows-x64:
+    name: Windows 2022 x64
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up MSVC
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: amd64
+          spectre: true
+
+      - name: Install dependencies
+        id: deps
+        uses: ./.github/actions/install-dependencies
+        with:
+          qt-version: 6.11.2
+          vcpkg-triplet: x64-windows-release
+
+      - name: Configure
+        run: >-
+          ${{ env.CMAKE_CONFIGURE }} -G Ninja
+          ${{ steps.deps.outputs.vcpkg-cmake-config }}
+          -DPACKAGE_VERSION_LABEL=${{ env.PACKAGE_LABEL }}
+
+      - name: Build packages
+        run: cmake --build build --config Release -j8 --target package
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: deskflow-input-broadcast-v0.2.0-windows-x64
+          path: build/deskflow[-_]*.*
+          if-no-files-found: error
+
+      - name: Run tests
+        uses: ./.github/actions/run-tests
+        with:
+          job: package-windows-x64
+
+      - name: Test portable package
+        uses: ./.github/actions/test-package
+
+  ubuntu-x64:
+    name: Ubuntu latest x64
+    runs-on: ubuntu-latest
+    container: ubuntu:latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Install Git
+        run: |
+          apt-get update -qqq > /dev/null
+          apt-get install -qqq git devscripts > /dev/null
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          like: debian
+
+      - name: Configure
+        run: >-
+          ${{ env.CMAKE_CONFIGURE }} -G Ninja -DCMAKE_INSTALL_PREFIX=/usr
+          -DPACKAGE_VERSION_LABEL=${{ env.PACKAGE_LABEL }}
+
+      - name: Build package
+        run: cmake --build build --config Release -j8 --target package
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: deskflow-input-broadcast-v0.2.0-ubuntu-x64
+          path: build/deskflow[-_]*.deb
+          if-no-files-found: error
+
+      - name: Run tests
+        uses: ./.github/actions/run-tests
+        with:
+          job: package-ubuntu-x64
+
+      - name: Test package
+        uses: ./.github/actions/test-package
+        with:
+          like: debian
+
+  flatpak-x64:
+    name: Flatpak x64
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.10
+      options: --privileged
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Allow local Git sources
+        run: git config --global protocol.file.allow always
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: deskflow-${{ env.PACKAGE_LABEL }}-linux-x86_64.flatpak
+          manifest-path: deploy/linux/flatpak/org.deskflow.deskflow.yml
+          cache-key: input-broadcast-flatpak-x86_64
+          arch: x86_64
+          upload-artifact: false
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: deskflow-input-broadcast-v0.2.0-flatpak-x64
+          path: deskflow[-_]*.flatpak
+          if-no-files-found: error

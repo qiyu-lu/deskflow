@@ -900,6 +900,11 @@ bool OSXScreen::isPrimary() const
   return m_isPrimary;
 }
 
+bool OSXScreen::hasMultipleMonitors() const
+{
+  return m_multimon;
+}
+
 void OSXScreen::sendEvent(EventTypes type, void *data) const
 {
   m_events->addEvent(Event(type, getEventTarget(), data));
@@ -1347,6 +1352,7 @@ bool OSXScreen::updateScreenShape()
   m_y = (int32_t)totalBounds.origin.y;
   m_w = (int32_t)totalBounds.size.width;
   m_h = (int32_t)totalBounds.size.height;
+  m_multimon = displayCount > 1;
 
   // get center of default screen
   CGDirectDisplayID main = CGMainDisplayID();

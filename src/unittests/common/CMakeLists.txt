@@ -28,3 +28,17 @@ create_test(
   SOURCE KeySequenceTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/common"
 )
+
+create_test(
+  NAME ActionTests
+  DEPENDS common
+  SOURCE ActionTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/common"
+)
+
+create_test(
+  NAME MouseBroadcastProtocolTests
+  DEPENDS common
+  SOURCE MouseBroadcastProtocolTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/common"
+)

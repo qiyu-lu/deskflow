@@ -521,6 +521,7 @@ void Client::cleanupConnection()
 void Client::cleanupScreen()
 {
   if (m_server != nullptr) {
+    ipcSendInputBroadcastState(0);
     if (m_ready) {
       m_screen->disable();
       m_ready = false;
