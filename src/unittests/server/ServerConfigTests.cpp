@@ -196,4 +196,32 @@ end
   QVERIFY(action->getScreens() == std::set<std::string>({"client1", "client2"}));
 }
 
+void ServerConfigTests::keyboardBroadcastAction_parsesSelectedScreens()
+{
+  std::istringstream input(R"(
+section: screens
+  primary:
+  client1:
+  client2:
+end
+section: links
+end
+section: options
+  keystroke(control+shift+f9) = keyboardBroadcast(toggle,client1:client2)
+end
+)");
+  Config config(nullptr);
+  input >> config;
+
+  InputFilter *filter = config.getInputFilter();
+  QCOMPARE(filter->getNumRules(), 1u);
+  const InputFilter::Rule &rule = filter->getRule(0);
+  QCOMPARE(rule.getNumActions(true), 1u);
+
+  const auto *action = dynamic_cast<const InputFilter::KeyboardBroadcastAction *>(&rule.getAction(true, 0));
+  QVERIFY(action != nullptr);
+  QCOMPARE(action->getMode(), InputFilter::KeyboardBroadcastAction::kToggle);
+  QVERIFY(action->getScreens() == std::set<std::string>({"client1", "client2"}));
+}
+
 QTEST_MAIN(ServerConfigTests)

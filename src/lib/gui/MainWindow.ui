@@ -308,9 +308,26 @@
               </spacer>
              </item>
              <item>
+              <widget class="QLabel" name="lblInputBroadcast">
+               <property name="text">
+                <string>Broadcast:</string>
+               </property>
+              </widget>
+             </item>
+             <item>
               <widget class="QCheckBox" name="checkMouseBroadcast">
                <property name="text">
-                <string>Mouse broadcasting</string>
+                <string>Mouse</string>
+               </property>
+               <property name="enabled">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="checkKeyboardBroadcast">
+               <property name="text">
+                <string>Keyboard</string>
                </property>
                <property name="enabled">
                 <bool>false</bool>

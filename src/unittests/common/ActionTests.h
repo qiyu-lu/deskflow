@@ -13,4 +13,6 @@ private Q_SLOTS:
   void mouseBroadcastText_allScreens();
   void mouseBroadcastText_selectedScreens();
   void mouseBroadcastSettings_roundTripsMode();
+  void keyboardBroadcastText_selectedScreens();
+  void keyboardBroadcastSettings_roundTripsMode();
 };

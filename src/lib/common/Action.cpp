@@ -58,6 +58,14 @@ QString Action::text() const
     text.append(m_commandTemplate.arg(commandArgs));
   } break;
 
+  case Type::keyboardBroadcast: {
+    QString commandArgs = m_mouseBroadcastModeNames.at(m_keyboardBroadcastMode);
+    if (haveScreens() && !m_typeScreenNames.isEmpty()) {
+      commandArgs.append(QStringLiteral(",%1").arg(m_typeScreenNames.join(QStringLiteral(":"))));
+    }
+    text.append(m_commandTemplate.arg(commandArgs));
+  } break;
+
   default:
     break;
   }
@@ -89,6 +97,9 @@ void Action::loadSettings(QSettings &settings)
   setMouseBroadcastMode(
       settings.value(SettingsKeys::MouseBroadcast, static_cast<int>(MouseBroadcastMode::toggle)).toInt()
   );
+  setKeyboardBroadcastMode(
+      settings.value(SettingsKeys::KeyboardBroadcast, static_cast<int>(MouseBroadcastMode::toggle)).toInt()
+  );
   setActiveOnRelease(settings.value(SettingsKeys::ActiveOnRelease, false).toBool());
   setHaveScreens(settings.value(SettingsKeys::HasScreens, false).toBool());
   setRestartServer(settings.value(SettingsKeys::RestartServer, false).toBool());
@@ -110,6 +121,7 @@ void Action::saveSettings(QSettings &settings) const
   settings.setValue(SettingsKeys::SwitchDirection, m_switchDirection);
   settings.setValue(SettingsKeys::LockToScreen, m_lockCursorMode);
   settings.setValue(SettingsKeys::MouseBroadcast, m_mouseBroadcastMode);
+  settings.setValue(SettingsKeys::KeyboardBroadcast, m_keyboardBroadcastMode);
   settings.setValue(SettingsKeys::ActiveOnRelease, m_activeOnRelease);
   settings.setValue(SettingsKeys::HasScreens, m_hasScreens);
   settings.setValue(SettingsKeys::RestartServer, m_restartServer);
@@ -164,6 +176,11 @@ int Action::mouseBroadcastMode() const
   return m_mouseBroadcastMode;
 }
 
+int Action::keyboardBroadcastMode() const
+{
+  return m_keyboardBroadcastMode;
+}
+
 bool Action::activeOnRelease() const
 {
   return m_activeOnRelease;
@@ -207,6 +224,11 @@ void Action::setLockCursorMode(int m)
 void Action::setMouseBroadcastMode(int m)
 {
   m_mouseBroadcastMode = m;
+}
+
+void Action::setKeyboardBroadcastMode(int m)
+{
+  m_keyboardBroadcastMode = m;
 }
 
 void Action::setActiveOnRelease(bool b)

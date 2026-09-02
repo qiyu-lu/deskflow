@@ -309,6 +309,10 @@ ServerProxy::ConnectionResult ServerProxy::parseMessage(const uint8_t *code)
     secureInputNotification();
   }
 
+  else if (memcmp(code, kMsgDInputBroadcastState, 4) == 0) {
+    inputBroadcastState();
+  }
+
   else if (memcmp(code, kMsgCClose, 4) == 0) {
     // server wants us to hangup
     LOG_VERBOSE("recv close");
@@ -847,6 +851,13 @@ void ServerProxy::secureInputNotification()
   std::string app;
   ProtocolUtil::readf(m_stream, kMsgDSecureInputNotification + 4, &app);
   LOG_INFO("application \"%s\" is blocking the keyboard", app.c_str());
+}
+
+void ServerProxy::inputBroadcastState()
+{
+  uint8_t modes = 0;
+  ProtocolUtil::readf(m_stream, kMsgDInputBroadcastState + 4, &modes);
+  ipcSendInputBroadcastState(modes);
 }
 
 void ServerProxy::setServerLanguages()

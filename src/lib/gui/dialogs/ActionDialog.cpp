@@ -35,6 +35,7 @@ ActionDialog::ActionDialog(QWidget *parent, const ServerConfig &config, Hotkey &
       Action::Type::lockCursorToScreen,
       Action::Type::restartAllConnections,
       Action::Type::mouseBroadcast,
+      Action::Type::keyboardBroadcast,
   };
   Q_ASSERT(ui->comboActionType->count() == static_cast<int>(actionTypes.size()));
   for (int i = 0; i < static_cast<int>(actionTypes.size()); ++i) {
@@ -55,6 +56,7 @@ ActionDialog::ActionDialog(QWidget *parent, const ServerConfig &config, Hotkey &
   ui->comboSwitchInDirection->setCurrentIndex(m_action.switchDirection());
   ui->comboLockCursorToScreen->setCurrentIndex(m_action.lockCursorMode());
   ui->comboMouseBroadcastMode->setCurrentIndex(m_action.mouseBroadcastMode());
+  ui->comboKeyboardBroadcastMode->setCurrentIndex(m_action.keyboardBroadcastMode());
 
   const int actionIndex = ui->comboActionType->findData(m_action.type());
   ui->comboActionType->setCurrentIndex(actionIndex >= 0 ? actionIndex : 0);
@@ -84,6 +86,7 @@ ActionDialog::ActionDialog(QWidget *parent, const ServerConfig &config, Hotkey &
   ui->comboSwitchInDirection->setVisible(false);
   ui->comboLockCursorToScreen->setVisible(false);
   ui->comboMouseBroadcastMode->setVisible(false);
+  ui->comboKeyboardBroadcastMode->setVisible(false);
 
   actionTypeChanged(ui->comboActionType->currentIndex());
 }
@@ -123,6 +126,7 @@ void ActionDialog::accept()
   m_action.setSwitchDirection(ui->comboSwitchInDirection->currentIndex());
   m_action.setLockCursorMode(ui->comboLockCursorToScreen->currentIndex());
   m_action.setMouseBroadcastMode(ui->comboMouseBroadcastMode->currentIndex());
+  m_action.setKeyboardBroadcastMode(ui->comboKeyboardBroadcastMode->currentIndex());
   m_action.setActiveOnRelease(ui->comboTriggerOn->currentIndex());
   m_action.setRestartServer(actionType == Action::Type::restartAllConnections);
 
@@ -133,14 +137,16 @@ void ActionDialog::updateSize()
 {
   setMaximumSize(QSize(16777215, 1677215));
   adjustSize();
-  if (!isKeyAction(currentActionType()) && currentActionType() != Action::Type::mouseBroadcast)
+  if (!isKeyAction(currentActionType()) && currentActionType() != Action::Type::mouseBroadcast &&
+      currentActionType() != Action::Type::keyboardBroadcast)
     setMaximumSize(size());
 }
 
 void ActionDialog::keySequenceChanged()
 {
   ui->listScreens->setEnabled(
-      currentActionType() == Action::Type::mouseBroadcast || !ui->keySequenceWidget->keySequence().isMouseButton()
+      currentActionType() == Action::Type::mouseBroadcast || currentActionType() == Action::Type::keyboardBroadcast ||
+      !ui->keySequenceWidget->keySequence().isMouseButton()
   );
   ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(canSave());
 }
@@ -154,17 +160,20 @@ void ActionDialog::actionTypeChanged(int index)
 {
   const auto actionType = static_cast<Action::Type>(ui->comboActionType->itemData(index).toInt());
   const bool isMouseBroadcast = actionType == Action::Type::mouseBroadcast;
+  const bool isKeyboardBroadcast = actionType == Action::Type::keyboardBroadcast;
+  const bool isBroadcast = isMouseBroadcast || isKeyboardBroadcast;
   ui->keySequenceWidget->setVisible(isKeyAction(actionType));
-  ui->groupScreens->setVisible(isKeyAction(actionType) || isMouseBroadcast);
-  ui->listScreens->setEnabled(isMouseBroadcast || !ui->keySequenceWidget->keySequence().isMouseButton());
+  ui->groupScreens->setVisible(isKeyAction(actionType) || isBroadcast);
+  ui->listScreens->setEnabled(isBroadcast || !ui->keySequenceWidget->keySequence().isMouseButton());
   for (int i = 0; i < ui->listScreens->count(); ++i) {
     auto *item = ui->listScreens->item(i);
-    item->setHidden(isMouseBroadcast && item->data(Qt::UserRole).toBool());
+    item->setHidden(isBroadcast && item->data(Qt::UserRole).toBool());
   }
   ui->comboSwitchToScreen->setVisible(actionType == Action::Type::switchToScreen);
   ui->comboSwitchInDirection->setVisible(actionType == Action::Type::switchInDirection);
   ui->comboLockCursorToScreen->setVisible(actionType == Action::Type::lockCursorToScreen);
   ui->comboMouseBroadcastMode->setVisible(isMouseBroadcast);
+  ui->comboKeyboardBroadcastMode->setVisible(isKeyboardBroadcast);
   ui->buttonBox->button(QDialogButtonBox::Ok)->setEnabled(canSave());
   QTimer::singleShot(1, this, &ActionDialog::updateSize);
 }
@@ -182,14 +191,15 @@ bool ActionDialog::isKeyAction(Action::Type type) const
 bool ActionDialog::canSave() const
 {
   const auto actionType = currentActionType();
-  if (isKeyAction(actionType) || actionType == Action::Type::mouseBroadcast) {
+  if (isKeyAction(actionType) || actionType == Action::Type::mouseBroadcast ||
+      actionType == Action::Type::keyboardBroadcast) {
     const QList<QListWidgetItem *> items = ui->listScreens->findItems("*", Qt::MatchWildcard);
     int totalChecked = 0;
     for (const auto &item : items) {
       if (!item->isHidden() && item->checkState() == Qt::Checked)
         totalChecked++;
     }
-    if (actionType == Action::Type::mouseBroadcast)
+    if (actionType == Action::Type::mouseBroadcast || actionType == Action::Type::keyboardBroadcast)
       return totalChecked > 0;
 
     return !ui->keySequenceWidget->keySequence().toString().isEmpty() && totalChecked > 0;

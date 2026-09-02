@@ -12,6 +12,7 @@
 #include "base/IEventQueue.h"
 #include "base/Log.h"
 #include "common/ExitCodes.h"
+#include "common/KeyboardBroadcastProtocol.h"
 #include "common/MouseBroadcastProtocol.h"
 #include "common/PlatformInfo.h"
 #include "common/Settings.h"
@@ -60,6 +61,18 @@ class MouseBroadcastRequest : public EventData
 {
 public:
   MouseBroadcastRequest(bool enabled, const QStringList &targets) : m_enabled(enabled), m_targets(targets)
+  {
+    // do nothing
+  }
+
+  bool m_enabled;
+  QStringList m_targets;
+};
+
+class KeyboardBroadcastRequest : public EventData
+{
+public:
+  KeyboardBroadcastRequest(bool enabled, const QStringList &targets) : m_enabled(enabled), m_targets(targets)
   {
     // do nothing
   }
@@ -122,6 +135,17 @@ void ServerApp::requestMouseBroadcast(bool enabled, const QStringList &targets)
 void ServerApp::requestMouseBroadcastState()
 {
   getEvents()->addEvent(Event(EventTypes::ServerAppMouseBroadcastState, getEvents()->getSystemTarget()));
+}
+
+void ServerApp::requestKeyboardBroadcast(bool enabled, const QStringList &targets)
+{
+  auto *request = new KeyboardBroadcastRequest(enabled, targets);
+  getEvents()->addEvent(Event(EventTypes::ServerAppKeyboardBroadcast, getEvents()->getSystemTarget(), request));
+}
+
+void ServerApp::requestKeyboardBroadcastState()
+{
+  getEvents()->addEvent(Event(EventTypes::ServerAppKeyboardBroadcastState, getEvents()->getSystemTarget()));
 }
 
 void ServerApp::loadConfig()
@@ -600,6 +624,36 @@ int ServerApp::mainLoop()
         }
       }
   );
+  getEvents()->addHandler(
+      EventTypes::ServerAppKeyboardBroadcast, getEvents()->getSystemTarget(),
+      [this](const auto &e) {
+        const auto *request = static_cast<const KeyboardBroadcastRequest *>(e.getDataObject());
+        if (m_server == nullptr) {
+          ipcSendToClient(
+              QStringLiteral("keyboardBroadcastState"),
+              deskflow::keyboard_broadcast::formatState(false, request->m_targets, QStringLiteral("serverUnavailable"))
+          );
+          return;
+        }
+
+        std::set<std::string> targets;
+        for (const auto &target : request->m_targets) {
+          targets.insert(target.toStdString());
+        }
+        m_server->setKeyboardBroadcast(
+            request->m_enabled ? Server::KeyboardBroadcastInfo::kOn : Server::KeyboardBroadcastInfo::kOff,
+            IKeyState::KeyInfo::join(targets)
+        );
+      }
+  );
+  getEvents()->addHandler(
+      EventTypes::ServerAppKeyboardBroadcastState, getEvents()->getSystemTarget(),
+      [this](const auto &) {
+        if (m_server != nullptr) {
+          m_server->sendKeyboardBroadcastStateIpc();
+        }
+      }
+  );
 
   // run event loop.  if startServer() failed we're supposed to retry
   // later.  the timer installed by startServer() will take care of
@@ -612,6 +666,8 @@ int ServerApp::mainLoop()
   getEvents()->removeHandler(EventTypes::ServerAppReloadConfig, getEvents()->getSystemTarget());
   getEvents()->removeHandler(EventTypes::ServerAppMouseBroadcast, getEvents()->getSystemTarget());
   getEvents()->removeHandler(EventTypes::ServerAppMouseBroadcastState, getEvents()->getSystemTarget());
+  getEvents()->removeHandler(EventTypes::ServerAppKeyboardBroadcast, getEvents()->getSystemTarget());
+  getEvents()->removeHandler(EventTypes::ServerAppKeyboardBroadcastState, getEvents()->getSystemTarget());
   cleanupServer();
   LOG_INFO("stopped server");
 

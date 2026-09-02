@@ -10,6 +10,8 @@
 
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "common/InputBroadcast.h"
+#include "common/KeyboardBroadcastProtocol.h"
 #include "common/MouseBroadcastProtocol.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/DeskflowException.h"
@@ -191,6 +193,7 @@ Server::~Server()
   m_events->removeHandler(PrimaryScreenSaverDeactivated, m_primaryClient->getEventTarget());
   m_events->removeHandler(PrimaryScreenFakeInputBegin, m_inputFilter);
   m_events->removeHandler(PrimaryScreenFakeInputEnd, m_inputFilter);
+  m_events->removeHandler(ServerKeyboardBroadcast, m_inputFilter);
   m_events->removeHandler(ServerMouseBroadcast, m_inputFilter);
   m_events->removeHandler(Timer, this);
   stopSwitch();
@@ -294,6 +297,7 @@ void Server::adoptClient(BaseClientProxy *client)
   // send configuration options to client
   sendOptions(client);
   reconcileMouseBroadcastTargets();
+  reconcileKeyboardBroadcastTargets();
 
   // activate screen saver on new client if active on the primary screen
   if (m_activeSaver != nullptr) {
@@ -436,6 +440,11 @@ void Server::switchScreen(BaseClientProxy *dst, int32_t x, int32_t y, bool forSc
     return;
   }
 
+  if (!forScreensaver && m_keyboardBroadcasting && m_active == m_primaryClient && dst != m_primaryClient) {
+    LOG_INFO("keyboard broadcasting disabled because the cursor left the primary screen");
+    updateKeyboardBroadcast(KeyboardBroadcastInfo::kOff, m_keyboardBroadcastingScreens, "cursorLeftServer");
+  }
+
   int32_t dx;
   int32_t dy;
   int32_t dw;
@@ -549,6 +558,7 @@ void Server::switchScreen(BaseClientProxy *dst, int32_t x, int32_t y, bool forSc
 
     if (m_active == m_primaryClient) {
       reconcileMouseBroadcastTargets();
+      reconcileKeyboardBroadcastTargets();
     }
   } else {
     m_active->mouseMove(x, y);
@@ -1299,7 +1309,7 @@ void Server::handleKeyRepeatEvent(const Event &event)
 {
   const auto *info = static_cast<IPlatformScreen::KeyInfo *>(event.getData());
   auto lang = AppUtil::instance().getCurrentLanguageCode();
-  onKeyRepeat(info->m_key, info->m_mask, info->m_count, info->m_button, lang);
+  onKeyRepeat(info->m_key, info->m_mask, info->m_count, info->m_button, lang, info->m_screens.c_str());
 }
 
 void Server::handleButtonDownEvent(const Event &event)
@@ -1436,10 +1446,20 @@ void Server::handleToggleScreenEvent(const Event &)
 void Server::handleKeyboardBroadcastEvent(const Event &event)
 {
   const auto *info = static_cast<KeyboardBroadcastInfo *>(event.getData());
+  setKeyboardBroadcast(info->m_state, info->m_screens);
+}
 
-  // choose new state
+void Server::setKeyboardBroadcast(KeyboardBroadcastInfo::State state, const std::string &screens)
+{
+  updateKeyboardBroadcast(state, screens, "");
+}
+
+void Server::updateKeyboardBroadcast(KeyboardBroadcastInfo::State state, const std::string &screens, const char *reason)
+{
+  const char *stateReason = reason;
+
   bool newState;
-  switch (info->m_state) {
+  switch (state) {
   default:
   case KeyboardBroadcastInfo::kOn:
     newState = true;
@@ -1454,15 +1474,46 @@ void Server::handleKeyboardBroadcastEvent(const Event &event)
     break;
   }
 
-  // enter new state
-  if (newState != m_keyboardBroadcasting || info->m_screens != m_keyboardBroadcastingScreens) {
-    m_keyboardBroadcasting = newState;
-    m_keyboardBroadcastingScreens = info->m_screens;
-    LOG(
-        (CLOG_DEBUG "keyboard broadcasting %s: %s", m_keyboardBroadcasting ? "on" : "off",
-         m_keyboardBroadcastingScreens.c_str())
-    );
+  if (newState && (m_active != m_primaryClient || m_activeSaver != nullptr)) {
+    newState = false;
+    stateReason = "cursorNotOnServer";
+    LOG_WARN("keyboard broadcasting requires the cursor to be on the primary screen; enable request ignored");
   }
+
+  if (newState && !hasConnectedKeyboardBroadcastTarget(screens)) {
+    newState = false;
+    stateReason = "noTargets";
+    LOG_WARN("keyboard broadcasting requires at least one connected target; enable request ignored");
+  }
+
+  if (newState != m_keyboardBroadcasting || screens != m_keyboardBroadcastingScreens) {
+    m_keyboardBroadcasting = newState;
+    m_keyboardBroadcastingScreens = screens;
+    LOG_DEBUG(
+        "keyboard broadcasting %s: %s", m_keyboardBroadcasting ? "on" : "off", m_keyboardBroadcastingScreens.c_str()
+    );
+    reconcileKeyboardBroadcastTargets();
+  }
+
+  sendKeyboardBroadcastStateIpc(stateReason);
+}
+
+void Server::sendKeyboardBroadcastStateIpc(const char *reason) const
+{
+  std::set<std::string> targets;
+  IKeyState::KeyInfo::split(m_keyboardBroadcastingScreens.c_str(), targets);
+
+  QStringList targetList;
+  if (!targets.contains("*")) {
+    for (const auto &target : targets) {
+      targetList.append(QString::fromStdString(target));
+    }
+  }
+
+  ipcSendToClient(
+      QStringLiteral("keyboardBroadcastState"),
+      deskflow::keyboard_broadcast::formatState(m_keyboardBroadcasting, targetList, QString::fromUtf8(reason))
+  );
 }
 
 void Server::handleMouseBroadcastEvent(const Event &event)
@@ -1646,6 +1697,8 @@ void Server::reconcileMouseBroadcastTargets()
     m_mouseBroadcastEnteredScreens.insert(name);
     LOG_DEBUG("mouse broadcast entered screen \"%s\"", name.c_str());
   }
+
+  sendInputBroadcastStates();
 }
 
 void Server::leaveMouseBroadcastTarget(BaseClientProxy *client)
@@ -1656,6 +1709,13 @@ void Server::leaveMouseBroadcastTarget(BaseClientProxy *client)
   }
 
   m_mouseBroadcastEnteredScreens.erase(name);
+  const auto keys = m_keyboardBroadcastKeysDown.find(name);
+  if (keys != m_keyboardBroadcastKeysDown.end()) {
+    for (const auto &[_, key] : keys->second) {
+      client->keyUp(key.m_id, key.m_mask, key.m_button);
+    }
+    m_keyboardBroadcastKeysDown.erase(keys);
+  }
   for (const auto button : m_mouseButtonsDown) {
     client->mouseUp(button);
   }
@@ -1727,6 +1787,163 @@ void Server::broadcastMouseWheel(int32_t xDelta, int32_t yDelta)
     const auto client = m_clients.find(name);
     if (client != m_clients.end()) {
       client->second->mouseWheel(xDelta, yDelta);
+    }
+  }
+}
+
+bool Server::isKeyboardBroadcastTarget(const std::string &name) const
+{
+  return isKeyboardBroadcastTarget(name, m_keyboardBroadcastingScreens);
+}
+
+bool Server::isKeyboardBroadcastTarget(const std::string &name, const std::string &screens) const
+{
+  const char *screensValue = screens.c_str();
+  return IKeyState::KeyInfo::isDefault(screensValue) || IKeyState::KeyInfo::contains(screensValue, name);
+}
+
+bool Server::hasConnectedKeyboardBroadcastTarget(const std::string &screens) const
+{
+  for (const auto &[name, client] : m_clients) {
+    if (client != m_primaryClient && isKeyboardBroadcastTarget(name, screens)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void Server::reconcileKeyboardBroadcastTargets()
+{
+  std::set<std::string> desiredScreens;
+  if (m_keyboardBroadcasting && m_active == m_primaryClient && m_activeSaver == nullptr) {
+    for (const auto &[name, client] : m_clients) {
+      if (client != m_primaryClient && isKeyboardBroadcastTarget(name)) {
+        desiredScreens.insert(name);
+      }
+    }
+  }
+
+  const auto currentScreens = m_keyboardBroadcastTargetScreens;
+  for (const auto &name : currentScreens) {
+    if (desiredScreens.contains(name)) {
+      continue;
+    }
+
+    const auto client = m_clients.find(name);
+    if (client != m_clients.end()) {
+      leaveKeyboardBroadcastTarget(client->second);
+    } else {
+      m_keyboardBroadcastTargetScreens.erase(name);
+      m_keyboardBroadcastKeysDown.erase(name);
+    }
+  }
+
+  for (const auto &name : desiredScreens) {
+    if (m_keyboardBroadcastTargetScreens.insert(name).second) {
+      LOG_DEBUG("keyboard broadcast activated for screen \"%s\"", name.c_str());
+    }
+  }
+
+  sendInputBroadcastStates();
+}
+
+void Server::leaveKeyboardBroadcastTarget(BaseClientProxy *client)
+{
+  const auto name = getName(client);
+  if (!m_keyboardBroadcastTargetScreens.erase(name)) {
+    return;
+  }
+
+  const auto keys = m_keyboardBroadcastKeysDown.find(name);
+  if (keys != m_keyboardBroadcastKeysDown.end()) {
+    for (const auto &[_, key] : keys->second) {
+      client->keyUp(key.m_id, key.m_mask, key.m_button);
+    }
+    m_keyboardBroadcastKeysDown.erase(keys);
+  }
+  LOG_DEBUG("keyboard broadcast deactivated for screen \"%s\"", name.c_str());
+}
+
+void Server::leaveKeyboardBroadcastTargets()
+{
+  const auto targetScreens = m_keyboardBroadcastTargetScreens;
+  for (const auto &name : targetScreens) {
+    const auto client = m_clients.find(name);
+    if (client != m_clients.end()) {
+      leaveKeyboardBroadcastTarget(client->second);
+    } else {
+      m_keyboardBroadcastTargetScreens.erase(name);
+      m_keyboardBroadcastKeysDown.erase(name);
+    }
+  }
+  sendInputBroadcastStates();
+}
+
+void Server::broadcastKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &language)
+{
+  if (!m_keyboardBroadcasting || m_active != m_primaryClient || m_activeSaver != nullptr) {
+    return;
+  }
+
+  for (const auto &name : m_keyboardBroadcastTargetScreens) {
+    const auto client = m_clients.find(name);
+    if (client == m_clients.end()) {
+      continue;
+    }
+    client->second->keyDown(id, mask, button, language);
+    m_keyboardBroadcastKeysDown[name][button] = BroadcastKey{id, mask, button};
+  }
+}
+
+void Server::broadcastKeyRepeat(
+    KeyID id, KeyModifierMask mask, int32_t count, KeyButton button, const std::string &language
+)
+{
+  if (!m_keyboardBroadcasting || m_active != m_primaryClient || m_activeSaver != nullptr) {
+    return;
+  }
+
+  for (const auto &name : m_keyboardBroadcastTargetScreens) {
+    const auto client = m_clients.find(name);
+    const auto keys = m_keyboardBroadcastKeysDown.find(name);
+    if (client != m_clients.end() && keys != m_keyboardBroadcastKeysDown.end() && keys->second.contains(button)) {
+      client->second->keyRepeat(id, mask, count, button, language);
+    }
+  }
+}
+
+void Server::broadcastKeyUp(KeyID id, KeyModifierMask mask, KeyButton button)
+{
+  if (!m_keyboardBroadcasting || m_active != m_primaryClient || m_activeSaver != nullptr) {
+    return;
+  }
+
+  for (const auto &name : m_keyboardBroadcastTargetScreens) {
+    const auto client = m_clients.find(name);
+    const auto keys = m_keyboardBroadcastKeysDown.find(name);
+    if (client == m_clients.end() || keys == m_keyboardBroadcastKeysDown.end() || !keys->second.contains(button)) {
+      continue;
+    }
+    client->second->keyUp(id, mask, button);
+    keys->second.erase(button);
+  }
+}
+
+void Server::sendInputBroadcastStates()
+{
+  using namespace deskflow::input_broadcast;
+
+  for (const auto &[name, client] : m_clients) {
+    if (client == m_primaryClient || !client->supportsInputBroadcastState()) {
+      continue;
+    }
+
+    const uint8_t activeModes =
+        modes(m_mouseBroadcastEnteredScreens.contains(name), m_keyboardBroadcastTargetScreens.contains(name));
+    const auto sent = m_inputBroadcastModesSent.find(name);
+    if (sent == m_inputBroadcastModesSent.end() || sent->second != activeModes) {
+      client->inputBroadcastState(activeModes);
+      m_inputBroadcastModesSent[name] = activeModes;
     }
   }
 }
@@ -1811,6 +2028,13 @@ void Server::onScreensaver(bool activated)
   LOG_DEBUG("onScreenSaver %s", activated ? "activated" : "deactivated");
 
   if (activated) {
+    if (m_mouseBroadcasting) {
+      updateMouseBroadcast(MouseBroadcastInfo::kOff, m_mouseBroadcastingScreens, "screensaver");
+    }
+    if (m_keyboardBroadcasting) {
+      updateKeyboardBroadcast(KeyboardBroadcastInfo::kOff, m_keyboardBroadcastingScreens, "screensaver");
+    }
+
     // save current screen and position
     m_activeSaver = m_active;
     m_xSaver = m_x;
@@ -1859,6 +2083,7 @@ void Server::onScreensaver(bool activated)
   }
 
   reconcileMouseBroadcastTargets();
+  reconcileKeyboardBroadcastTargets();
 }
 
 void Server::onKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang, const char *screens)
@@ -1866,22 +2091,17 @@ void Server::onKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const s
   LOG_VERBOSE("onKeyDown id=%d mask=0x%04x button=0x%04x lang=%s", id, mask, button, lang.c_str());
   assert(m_active != nullptr);
 
-  // relay
-  if (!m_keyboardBroadcasting && IKeyState::KeyInfo::isDefault(screens)) {
-    m_active->keyDown(id, mask, button, lang);
-  } else {
-    if (!screens && m_keyboardBroadcasting) {
-      screens = m_keyboardBroadcastingScreens.c_str();
-      if (IKeyState::KeyInfo::isDefault(screens)) {
-        screens = "*";
-      }
-    }
+  if (!IKeyState::KeyInfo::isDefault(screens)) {
     for (ClientList::const_iterator index = m_clients.begin(); index != m_clients.end(); ++index) {
       if (IKeyState::KeyInfo::contains(screens, index->first)) {
         index->second->keyDown(id, mask, button, lang);
       }
     }
+    return;
   }
+
+  m_active->keyDown(id, mask, button, lang);
+  broadcastKeyDown(id, mask, button, lang);
 }
 
 void Server::onKeyUp(KeyID id, KeyModifierMask mask, KeyButton button, const char *screens)
@@ -1889,25 +2109,22 @@ void Server::onKeyUp(KeyID id, KeyModifierMask mask, KeyButton button, const cha
   LOG_VERBOSE("onKeyUp id=%d mask=0x%04x button=0x%04x", id, mask, button);
   assert(m_active != nullptr);
 
-  // relay
-  if (!m_keyboardBroadcasting && IKeyState::KeyInfo::isDefault(screens)) {
-    m_active->keyUp(id, mask, button);
-  } else {
-    if (!screens && m_keyboardBroadcasting) {
-      screens = m_keyboardBroadcastingScreens.c_str();
-      if (IKeyState::KeyInfo::isDefault(screens)) {
-        screens = "*";
-      }
-    }
+  if (!IKeyState::KeyInfo::isDefault(screens)) {
     for (ClientList::const_iterator index = m_clients.begin(); index != m_clients.end(); ++index) {
       if (IKeyState::KeyInfo::contains(screens, index->first)) {
         index->second->keyUp(id, mask, button);
       }
     }
+    return;
   }
+
+  broadcastKeyUp(id, mask, button);
+  m_active->keyUp(id, mask, button);
 }
 
-void Server::onKeyRepeat(KeyID id, KeyModifierMask mask, int32_t count, KeyButton button, const std::string &lang)
+void Server::onKeyRepeat(
+    KeyID id, KeyModifierMask mask, int32_t count, KeyButton button, const std::string &lang, const char *screens
+)
 {
   LOG(
       (CLOG_VERBOSE "onKeyRepeat id=%d mask=0x%04x count=%d button=0x%04x lang=\"%s\"", id, mask, count, button,
@@ -1915,8 +2132,17 @@ void Server::onKeyRepeat(KeyID id, KeyModifierMask mask, int32_t count, KeyButto
   );
   assert(m_active != nullptr);
 
-  // relay
+  if (!IKeyState::KeyInfo::isDefault(screens)) {
+    for (ClientList::const_iterator index = m_clients.begin(); index != m_clients.end(); ++index) {
+      if (IKeyState::KeyInfo::contains(screens, index->first)) {
+        index->second->keyRepeat(id, mask, count, button, lang);
+      }
+    }
+    return;
+  }
+
   m_active->keyRepeat(id, mask, count, button, lang);
+  broadcastKeyRepeat(id, mask, count, button, lang);
 }
 
 void Server::onMouseDown(ButtonID id)
@@ -2274,6 +2500,9 @@ bool Server::removeClient(BaseClientProxy *client)
   // remove from list
   const auto name = getName(client);
   m_mouseBroadcastEnteredScreens.erase(name);
+  m_keyboardBroadcastTargetScreens.erase(name);
+  m_keyboardBroadcastKeysDown.erase(name);
+  m_inputBroadcastModesSent.erase(name);
   m_clients.erase(name);
   m_clientSet.erase(i);
 
@@ -2281,6 +2510,12 @@ bool Server::removeClient(BaseClientProxy *client)
       !hasConnectedMouseBroadcastTarget(m_mouseBroadcastingScreens)) {
     LOG_WARN("mouse broadcasting disabled because the last selected target disconnected");
     updateMouseBroadcast(MouseBroadcastInfo::kOff, m_mouseBroadcastingScreens, "targetDisconnected");
+  }
+
+  if (client != m_primaryClient && m_keyboardBroadcasting &&
+      !hasConnectedKeyboardBroadcastTarget(m_keyboardBroadcastingScreens)) {
+    LOG_WARN("keyboard broadcasting disabled because the last selected target disconnected");
+    updateKeyboardBroadcast(KeyboardBroadcastInfo::kOff, m_keyboardBroadcastingScreens, "targetDisconnected");
   }
 
   return true;
@@ -2301,7 +2536,9 @@ void Server::closeClient(BaseClientProxy *client, const char *msg)
   // client.
   LOG_INFO("disconnecting client \"%s\"", getName(client).c_str());
 
+  leaveKeyboardBroadcastTarget(client);
   leaveMouseBroadcastTarget(client);
+  sendInputBroadcastStates();
 
   // send message
   // FIXME -- avoid type cast (kinda hard, though)

@@ -14,6 +14,7 @@ private Q_SLOTS:
   void KeyboardBroadcastInfo_alloc_stateAndSceens();
   void MouseBroadcastInfo_alloc_stateAndScreens();
   void MouseBroadcastAction_formatsSelectedScreens();
+  void KeyboardBroadcastAction_formatsSelectedScreens();
   void mapMouseBroadcastCoordinate_data();
   void mapMouseBroadcastCoordinate();
   void mouseBroadcastStartAllowed_data();

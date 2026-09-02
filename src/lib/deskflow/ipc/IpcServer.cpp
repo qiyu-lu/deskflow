@@ -154,11 +154,18 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
   clientSocket->flush();
 }
 
-void IpcServer::broadcastCommand(const QString &command, const QString &args)
+void IpcServer::broadcastCommand(const QString &command, const QString &args, bool queueIfNoClients)
 {
   const auto message = args.isEmpty() ? command : QStringLiteral("%1=%2").arg(command, args);
 
   if (m_clients.isEmpty()) {
+    if (!queueIfNoClients) {
+      LOG_VERBOSE(
+          "%s ipc server has no clients, state message not queued: %s", m_typeName.constData(),
+          message.toUtf8().constData()
+      );
+      return;
+    }
     LOG_VERBOSE(
         "%s ipc server has no clients, message queued: %s", m_typeName.constData(), message.toUtf8().constData()
     );

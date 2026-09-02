@@ -8,6 +8,7 @@
 
 #include "base/Log.h"
 #include "common/Constants.h"
+#include "common/KeyboardBroadcastProtocol.h"
 #include "common/MouseBroadcastProtocol.h"
 
 #include <QLocalSocket>
@@ -26,6 +27,12 @@ CoreIpcServer &CoreIpcServer::instance()
 {
   assert(s_instance != nullptr);
   return *s_instance;
+}
+
+void CoreIpcServer::setInputBroadcastState(uint8_t modes)
+{
+  m_inputBroadcastModes = modes;
+  broadcastCommand(QStringLiteral("inputBroadcastState"), QString::number(modes), false);
 }
 
 void CoreIpcServer::processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts)
@@ -64,6 +71,48 @@ void CoreIpcServer::processCommand(QLocalSocket *clientSocket, const QString &co
     }
 
     Q_EMIT mouseBroadcastStateRequested();
+    return;
+  }
+
+  if (command == QStringLiteral("keyboardBroadcast")) {
+    if (parts.size() != 2) {
+      LOG_WARN("core ipc server got invalid keyboard broadcast request");
+      writeToClientSocket(clientSocket, QStringLiteral("error=invalid keyboard broadcast request"));
+      return;
+    }
+
+    const auto request = deskflow::keyboard_broadcast::parseRequest(parts.at(1));
+    if (!request.has_value()) {
+      LOG_WARN("core ipc server got invalid keyboard broadcast payload");
+      writeToClientSocket(clientSocket, QStringLiteral("error=invalid keyboard broadcast payload"));
+      return;
+    }
+
+    Q_EMIT keyboardBroadcastRequested(request->enabled, request->targets);
+    return;
+  }
+
+  if (command == QStringLiteral("getKeyboardBroadcastState")) {
+    if (parts.size() != 1) {
+      LOG_WARN("core ipc server got invalid keyboard broadcast state request");
+      writeToClientSocket(clientSocket, QStringLiteral("error=invalid keyboard broadcast state request"));
+      return;
+    }
+
+    Q_EMIT keyboardBroadcastStateRequested();
+    return;
+  }
+
+  if (command == QStringLiteral("getInputBroadcastState")) {
+    if (parts.size() != 1) {
+      LOG_WARN("core ipc server got invalid input broadcast state request");
+      writeToClientSocket(clientSocket, QStringLiteral("error=invalid input broadcast state request"));
+      return;
+    }
+
+    writeToClientSocket(
+        clientSocket, QStringLiteral("inputBroadcastState=%1").arg(QString::number(m_inputBroadcastModes))
+    );
     return;
   }
 

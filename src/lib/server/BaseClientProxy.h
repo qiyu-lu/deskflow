@@ -80,6 +80,14 @@ public:
   virtual void fileChunkSending(uint8_t mark, char *data, size_t dataSize) = 0;
   virtual std::string getSecureInputApp() const = 0;
   virtual void secureInputNotification(const std::string &app) const = 0;
+  virtual bool supportsInputBroadcastState() const
+  {
+    return false;
+  }
+  virtual void inputBroadcastState(uint8_t)
+  {
+    // Protocol versions before 1.9 do not support this status message.
+  }
   std::string getName() const override;
   virtual deskflow::IStream *getStream() const = 0;
 

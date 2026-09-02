@@ -8,6 +8,7 @@
 #include "CoreProcess.h"
 
 #include "common/ExitCodes.h"
+#include "common/KeyboardBroadcastProtocol.h"
 #include "common/MouseBroadcastProtocol.h"
 #include "gui/ipc/CoreIpcClient.h"
 #include "gui/ipc/DaemonIpcClient.h"
@@ -220,6 +221,18 @@ bool CoreProcess::setMouseBroadcast(bool enabled, const QStringList &targets)
   }
 
   m_coreIpcClient->sendMouseBroadcast(enabled, targets);
+  return true;
+}
+
+bool CoreProcess::setKeyboardBroadcast(bool enabled, const QStringList &targets)
+{
+  if (m_mode != Settings::CoreMode::Server || m_processState != ProcessState::Started || m_coreIpcClient == nullptr ||
+      !m_coreIpcClient->isConnected()) {
+    qWarning("cannot change keyboard broadcasting, core server ipc is not connected");
+    return false;
+  }
+
+  m_coreIpcClient->sendKeyboardBroadcast(enabled, targets);
   return true;
 }
 
@@ -456,7 +469,9 @@ void CoreProcess::start(std::optional<ProcessMode> processModeOption)
             qDebug("connected to core ipc server");
             if (m_mode == Settings::CoreMode::Server && coreIpcClient == m_coreIpcClient) {
               coreIpcClient->requestMouseBroadcastState();
+              coreIpcClient->requestKeyboardBroadcastState();
             }
+            coreIpcClient->requestInputBroadcastState();
           });
           connect(m_coreIpcClient, &ipc::CoreIpcClient::connectionFailed, this, [] {
             qWarning("failed to establish core ipc connection");
@@ -610,6 +625,21 @@ void CoreProcess::onCoreIpcMessageReceived(const QString &command, const QString
       return;
     }
     Q_EMIT mouseBroadcastStateChanged(state->enabled, state->targets, state->reason);
+  } else if (command == "keyboardBroadcastState") {
+    const auto state = deskflow::keyboard_broadcast::parseState(args);
+    if (!state.has_value()) {
+      qWarning("core ipc got invalid keyboard broadcast state: %s", qPrintable(args));
+      return;
+    }
+    Q_EMIT keyboardBroadcastStateChanged(state->enabled, state->targets, state->reason);
+  } else if (command == "inputBroadcastState") {
+    bool ok = false;
+    const int modes = args.toInt(&ok);
+    if (!ok || modes < 0 || modes > 3) {
+      qWarning("core ipc got invalid input broadcast state: %s", qPrintable(args));
+      return;
+    }
+    Q_EMIT inputBroadcastStateChanged(modes);
   } else if (command == "secureSocket") {
     Q_EMIT secureSocket(true);
     if (args != m_secureSocketVersion) {

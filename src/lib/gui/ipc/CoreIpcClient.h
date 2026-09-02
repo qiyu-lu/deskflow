@@ -22,6 +22,9 @@ public:
 
   void requestMouseBroadcastState();
   void sendMouseBroadcast(bool enabled, const QStringList &targets);
+  void requestKeyboardBroadcastState();
+  void sendKeyboardBroadcast(bool enabled, const QStringList &targets);
+  void requestInputBroadcastState();
   void sendStop();
 
 Q_SIGNALS:

@@ -150,6 +150,22 @@ p, li { white-space: pre-wrap; }
         <source>Disable mouse broadcasting</source>
         <translation>关闭鼠标广播</translation>
     </message>
+    <message>
+        <source>Control keyboard broadcasting</source>
+        <translation>键盘广播控制</translation>
+    </message>
+    <message>
+        <source>Toggle keyboard broadcasting (recommended)</source>
+        <translation>切换键盘广播（推荐）</translation>
+    </message>
+    <message>
+        <source>Enable keyboard broadcasting</source>
+        <translation>开启键盘广播</translation>
+    </message>
+    <message>
+        <source>Disable keyboard broadcasting</source>
+        <translation>关闭键盘广播</translation>
+    </message>
 </context>
 <context>
     <name>ClientConfigDialog</name>
@@ -603,7 +619,7 @@ Additionally, check you are able to %1 the server config file: %2</source>
     </message>
     <message>
         <source>Mouse broadcasting</source>
-        <translation>鼠标广播</translation>
+        <translation type="vanished">鼠标广播</translation>
     </message>
     <message>
         <source>Targets: All</source>
@@ -611,7 +627,7 @@ Additionally, check you are able to %1 the server config file: %2</source>
     </message>
     <message>
         <source>Stop mouse broadcasting</source>
-        <translation>停止鼠标广播</translation>
+        <translation type="vanished">停止鼠标广播</translation>
     </message>
     <message>
         <source>All connected computers</source>
@@ -676,6 +692,94 @@ Additionally, check you are able to %1 the server config file: %2</source>
     <message>
         <source>Send mouse movement, clicks, and scrolling to the selected computers.</source>
         <translation>将鼠标移动、点击和滚动发送到选中的计算机。</translation>
+    </message>
+    <message>
+        <source>Broadcast:</source>
+        <translation>广播：</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>鼠标</translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation>键盘</translation>
+    </message>
+    <message>
+        <source>Stop all input broadcasting</source>
+        <translation>停止所有输入广播</translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting could not be changed because the server is not ready.</source>
+        <translation>服务端尚未就绪，无法更改键盘广播状态。</translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped because the server screen was locked or entered the screen saver.</source>
+        <translation>服务端屏幕已锁定或进入屏幕保护，鼠标广播已停止。</translation>
+    </message>
+    <message>
+        <source>Move the cursor back to the server computer before starting keyboard broadcasting.</source>
+        <translation>请先将光标移回服务端计算机，再开启键盘广播。</translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the cursor left the server computer.</source>
+        <translation>光标已离开服务端计算机，键盘广播已停止。</translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting needs at least one selected computer to be connected.</source>
+        <translation>键盘广播至少需要一台选中的计算机已连接。</translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the last selected computer disconnected.</source>
+        <translation>最后一台选中的计算机已断开连接，键盘广播已停止。</translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the server screen was locked or entered the screen saver.</source>
+        <translation>服务端屏幕已锁定或进入屏幕保护，键盘广播已停止。</translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting started.</source>
+        <translation>键盘广播已开始。</translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped.</source>
+        <translation>键盘广播已停止。</translation>
+    </message>
+    <message>
+        <source>Input broadcasting stopped.</source>
+        <translation>输入广播已停止。</translation>
+    </message>
+    <message>
+        <source>Receiving mouse and keyboard broadcasting from the server.</source>
+        <translation>正在接收来自服务端的鼠标和键盘广播。</translation>
+    </message>
+    <message>
+        <source>Receiving mouse broadcasting from the server.</source>
+        <translation>正在接收来自服务端的鼠标广播。</translation>
+    </message>
+    <message>
+        <source>Receiving keyboard broadcasting from the server.</source>
+        <translation>正在接收来自服务端的键盘广播。</translation>
+    </message>
+    <message>
+        <source>Start the server to use keyboard broadcasting.</source>
+        <translation>请先启动服务端，再使用键盘广播。</translation>
+    </message>
+    <message>
+        <source>Waiting for the server to confirm keyboard broadcasting state.</source>
+        <translation>正在等待服务端确认键盘广播状态。</translation>
+    </message>
+    <message>
+        <source>Connect at least one selected computer to start keyboard broadcasting.</source>
+        <translation>请至少连接一台选中的计算机，再开启键盘广播。</translation>
+    </message>
+    <message>
+        <source>Raw key presses are being sent to the selected computers. Leaving the server stops broadcasting.</source>
+        <translation>正在将原始按键发送到选中的计算机。光标离开服务端后将停止广播。</translation>
+    </message>
+    <message>
+        <source>Send raw key presses to computers using the same keyboard layout. Input method text may differ.</source>
+        <translation>将原始按键发送到使用相同键盘布局的计算机。输入法文本可能不一致。</translation>
     </message>
 </context>
 <context>
@@ -1447,6 +1551,34 @@ Enabling this setting will disable the server config GUI.</source>
     <message>
         <source>Encryption Disabled</source>
         <translation>加密已禁用</translation>
+    </message>
+    <message>
+        <source>Mouse + Keyboard</source>
+        <translation>鼠标 + 键盘</translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation>鼠标</translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation>键盘</translation>
+    </message>
+    <message>
+        <source>Broadcasting: %1</source>
+        <translation>正在广播：%1</translation>
+    </message>
+    <message>
+        <source>Receiving: %1</source>
+        <translation>正在接收：%1</translation>
+    </message>
+    <message>
+        <source>Input events are being sent to the selected computers.</source>
+        <translation>正在将输入事件发送到选中的计算机。</translation>
+    </message>
+    <message>
+        <source>Input events from the server are being applied on this computer.</source>
+        <translation>正在此计算机上应用来自服务端的输入事件。</translation>
     </message>
 </context>
 <context>

@@ -19,6 +19,8 @@ add_library(common STATIC
   Hotkey.h
   I18N.h
   I18N.cpp
+  InputBroadcast.h
+  KeyboardBroadcastProtocol.h
   KeySequence.h
   KeySequence.cpp
   LogLevel.h

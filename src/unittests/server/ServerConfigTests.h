@@ -22,6 +22,7 @@ private Q_SLOTS:
   void equalityCheck_diff_neighbours2();
   void equalityCheck_diff_neighbours3();
   void mouseBroadcastAction_parsesSelectedScreens();
+  void keyboardBroadcastAction_parsesSelectedScreens();
 
 private:
   Arch m_arch;

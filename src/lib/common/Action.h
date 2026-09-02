@@ -26,6 +26,7 @@ struct SettingsKeys
   inline static const QString SwitchDirection = QStringLiteral("switchInDirection");
   inline static const QString LockToScreen = QStringLiteral("lockCursorToScreen");
   inline static const QString MouseBroadcast = QStringLiteral("mouseBroadcast");
+  inline static const QString KeyboardBroadcast = QStringLiteral("keyboardBroadcast");
   inline static const QString ActiveOnRelease = QStringLiteral("activeOnRelease");
   inline static const QString HasScreens = QStringLiteral("hasScreens");
   inline static const QString RestartServer = QStringLiteral("restartServer");
@@ -49,6 +50,7 @@ public:
     mouseUp,
     mousebutton,
     mouseBroadcast,
+    keyboardBroadcast,
   };
   enum class SwitchDirection
   {
@@ -101,6 +103,9 @@ public:
   int mouseBroadcastMode() const;
   void setMouseBroadcastMode(int m);
 
+  int keyboardBroadcastMode() const;
+  void setKeyboardBroadcastMode(int m);
+
   bool activeOnRelease() const;
   void setActiveOnRelease(bool b);
 
@@ -120,6 +125,7 @@ private:
   int m_switchDirection = static_cast<int>(SwitchDirection::left);
   int m_lockCursorMode = static_cast<int>(LockCursorMode::toggle);
   int m_mouseBroadcastMode = static_cast<int>(MouseBroadcastMode::toggle);
+  int m_keyboardBroadcastMode = static_cast<int>(MouseBroadcastMode::toggle);
   bool m_activeOnRelease = false;
   bool m_hasScreens = false;
   bool m_restartServer;
@@ -137,7 +143,8 @@ private:
       QStringLiteral("mouseDown"),
       QStringLiteral("mouseUp"),
       QStringLiteral("mousebutton"),
-      QStringLiteral("mouseBroadcast")
+      QStringLiteral("mouseBroadcast"),
+      QStringLiteral("keyboardBroadcast")
   };
 
   inline static const QStringList m_switchDirectionNames{

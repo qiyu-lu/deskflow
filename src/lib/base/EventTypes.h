@@ -164,6 +164,8 @@ enum class EventTypes : uint32_t
   ServerAppResetServer,
   ServerAppMouseBroadcast,
   ServerAppMouseBroadcastState,
+  ServerAppKeyboardBroadcast,
+  ServerAppKeyboardBroadcastState,
 
   /// This event is sent when key is down. Event data is a pointer to KeyInfo (count == 1)
   KeyStateKeyDown,

@@ -148,11 +148,16 @@ private:
   void setMouseBroadcastTargets(const QStringList &targets);
   void requestMouseBroadcast(bool enabled);
   void mouseBroadcastStateChanged(bool enabled, const QStringList &targets, const QString &reason);
+  void requestKeyboardBroadcast(bool enabled);
+  void keyboardBroadcastStateChanged(bool enabled, const QStringList &targets, const QString &reason);
+  void inputBroadcastStateChanged(int modes);
+  void updateInputBroadcastStatus();
   void updateMouseBroadcastControls();
   QStringList availableMouseBroadcastTargets() const;
   QStringList mouseBroadcastTargets() const;
   bool hasConnectedMouseBroadcastTarget() const;
   QString mouseBroadcastReasonText(const QString &reason) const;
+  QString keyboardBroadcastReasonText(const QString &reason) const;
 
   bool canRunCore() const;
 
@@ -192,6 +197,12 @@ private:
   bool m_mouseBroadcastStateKnown = false;
   bool m_mouseBroadcastRequestPending = false;
   bool m_mouseBroadcastRequestedEnabled = false;
+  bool m_keyboardBroadcasting = false;
+  bool m_keyboardBroadcastStateKnown = false;
+  bool m_keyboardBroadcastRequestPending = false;
+  bool m_keyboardBroadcastRequestedEnabled = false;
+  int m_inputBroadcastModes = 0;
+  bool m_inputBroadcastStateKnown = false;
   QSystemTrayIcon *m_trayIcon = nullptr;
   QLocalServer *m_guiDupeChecker = nullptr;
   deskflow::gui::ipc::DaemonIpcClient *m_daemonIpcClient = nullptr;
@@ -217,7 +228,7 @@ private:
   QAction *m_actionRestartCore = nullptr;
   QAction *m_actionStopCore = nullptr;
   QAction *m_actionShowHelp = nullptr;
-  QAction *m_actionStopMouseBroadcast = nullptr;
+  QAction *m_actionStopInputBroadcast = nullptr;
 
   // Network monitoring
   NetworkMonitor *m_networkMonitor = nullptr;

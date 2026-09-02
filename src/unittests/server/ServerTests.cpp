@@ -45,6 +45,16 @@ void ServerTests::MouseBroadcastAction_formatsSelectedScreens()
   QCOMPARE(action.format(), "mouseBroadcast(on,client1:client2)");
 }
 
+void ServerTests::KeyboardBroadcastAction_formatsSelectedScreens()
+{
+  const std::set<std::string> screens = {"client1", "client2"};
+  const InputFilter::KeyboardBroadcastAction action(nullptr, InputFilter::KeyboardBroadcastAction::kOn, screens);
+
+  QCOMPARE(action.getMode(), InputFilter::KeyboardBroadcastAction::kOn);
+  QVERIFY(action.getScreens() == screens);
+  QCOMPARE(action.format(), "keyboardBroadcast(on,client1:client2)");
+}
+
 void ServerTests::mapMouseBroadcastCoordinate_data()
 {
   QTest::addColumn<int>("value");

@@ -73,6 +73,8 @@ public:
   void resetServer();
   void requestMouseBroadcast(bool enabled, const QStringList &targets);
   void requestMouseBroadcastState();
+  void requestKeyboardBroadcast(bool enabled, const QStringList &targets);
+  void requestKeyboardBroadcastState();
   void handleClientConnected(const Event &e, ClientListener *listener);
   void closeServer(Server *server);
   void stopRetryTimer();

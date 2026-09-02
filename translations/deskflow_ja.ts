@@ -150,6 +150,22 @@ p, li { white-space: pre-wrap; }
         <source>Disable mouse broadcasting</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Control keyboard broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Toggle keyboard broadcasting (recommended)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable keyboard broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Disable keyboard broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ClientConfigDialog</name>
@@ -602,15 +618,7 @@ Additionally, check you are able to %1 the server config file: %2</source>
         <translation>&lt;p&gt;キーボードレイアウトのサポートには対応するレイアウトが全てのコンピューターに必要です。別のコンピューターで使用されている以下のレイアウトがこのコンピューターにインストールされていません:&lt;/p&gt;&lt;p&gt;&lt;b&gt;%1&lt;/b&gt;&lt;/p&gt;&lt;p&gt;サポートを有効にするには、これらのレイアウトをインストールしてください。&lt;/p&gt;</translation>
     </message>
     <message>
-        <source>Mouse broadcasting</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Targets: All</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Stop mouse broadcasting</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -675,6 +683,94 @@ Additionally, check you are able to %1 the server config file: %2</source>
     </message>
     <message>
         <source>Send mouse movement, clicks, and scrolling to the selected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcast:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stop all input broadcasting</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting could not be changed because the server is not ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse broadcasting stopped because the server screen was locked or entered the screen saver.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move the cursor back to the server computer before starting keyboard broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the cursor left the server computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting needs at least one selected computer to be connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the last selected computer disconnected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped because the server screen was locked or entered the screen saver.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting started.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard broadcasting stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Input broadcasting stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving mouse and keyboard broadcasting from the server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving mouse broadcasting from the server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving keyboard broadcasting from the server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Start the server to use keyboard broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for the server to confirm keyboard broadcasting state.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connect at least one selected computer to start keyboard broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Raw key presses are being sent to the selected computers. Leaving the server stops broadcasting.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send raw key presses to computers using the same keyboard layout. Input method text may differ.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1447,6 +1543,34 @@ Enabling this setting will disable the server config GUI.</source>
     <message>
         <source>Encryption Disabled</source>
         <translation>暗号化無効</translation>
+    </message>
+    <message>
+        <source>Mouse + Keyboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keyboard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Broadcasting: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receiving: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Input events are being sent to the selected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Input events from the server are being applied on this computer.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
