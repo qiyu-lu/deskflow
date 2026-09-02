@@ -19,7 +19,7 @@ env:
   CMAKE_CONFIGURE: >-
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=ON
     -DSKIP_BUILD_TESTS=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
-  PACKAGE_LABEL: mouse-broadcast-${{ github.run_number }}
+  PACKAGE_LABEL: input-broadcast-v0.2.0
 
 jobs:
   windows-x64:
@@ -58,7 +58,7 @@ jobs:
       - name: Upload packages
         uses: actions/upload-artifact@v7
         with:
-          name: deskflow-mouse-broadcast-windows-x64
+          name: deskflow-input-broadcast-v0.2.0-windows-x64
           path: build/deskflow[-_]*.*
           if-no-files-found: error
 
@@ -103,7 +103,7 @@ jobs:
       - name: Upload package
         uses: actions/upload-artifact@v7
         with:
-          name: deskflow-mouse-broadcast-ubuntu-x64
+          name: deskflow-input-broadcast-v0.2.0-ubuntu-x64
           path: build/deskflow[-_]*.deb
           if-no-files-found: error
 
@@ -139,13 +139,13 @@ jobs:
         with:
           bundle: deskflow-${{ env.PACKAGE_LABEL }}-linux-x86_64.flatpak
           manifest-path: deploy/linux/flatpak/org.deskflow.deskflow.yml
-          cache-key: mouse-broadcast-flatpak-x86_64
+          cache-key: input-broadcast-flatpak-x86_64
           arch: x86_64
           upload-artifact: false
 
       - name: Upload package
         uses: actions/upload-artifact@v7
         with:
-          name: deskflow-mouse-broadcast-flatpak-x64
+          name: deskflow-input-broadcast-v0.2.0-flatpak-x64
           path: deskflow[-_]*.flatpak
           if-no-files-found: error
